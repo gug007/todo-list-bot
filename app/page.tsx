@@ -27,6 +27,13 @@ declare global {
           chat?: object;
           auth_date?: number;
         };
+        version: string;
+        platform: string;
+        colorScheme: string;
+        themeParams: object;
+        isExpanded: boolean;
+        viewportHeight: number;
+        viewportStableHeight: number;
       };
     };
   }
@@ -35,75 +42,147 @@ declare global {
 export default function Home() {
   const [message, setMessage] = useState('');
   const [isReady, setIsReady] = useState(false);
-  const [debugInfo, setDebugInfo] = useState('');
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [error, setError] = useState('');
+
+  const addDebugInfo = (info: string) => {
+    setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${info}`]);
+  };
 
   const sendMessage = useCallback(() => {
     if (message.trim() && window.Telegram?.WebApp) {
       try {
         window.Telegram.WebApp.sendData(message.trim());
         setMessage(''); // Clear message after sending
+        addDebugInfo('Message sent successfully');
       } catch (err) {
-        setError(`Failed to send: ${err}`);
+        const errorMsg = `Failed to send: ${err}`;
+        setError(errorMsg);
+        addDebugInfo(errorMsg);
       }
     }
   }, [message]);
 
   useEffect(() => {
     let mounted = true;
+    let checkCount = 0;
+    const maxChecks = 20; // Check for 2 seconds
     
-    const initTelegram = () => {
-      try {
-        if (window.Telegram?.WebApp) {
-          const tg = window.Telegram.WebApp;
-          
-          // Initialize Telegram Web App
-          tg.ready();
-          
-          if (mounted) {
-            setIsReady(true);
-            setDebugInfo(`Telegram Web App initialized. User: ${tg.initDataUnsafe?.user?.first_name || 'Unknown'}`);
+    addDebugInfo('Starting Telegram initialization...');
+    addDebugInfo(`User Agent: ${navigator.userAgent}`);
+    addDebugInfo(`Current URL: ${window.location.href}`);
+    addDebugInfo(`Protocol: ${window.location.protocol}`);
+    
+    const checkTelegram = () => {
+      checkCount++;
+      addDebugInfo(`Check #${checkCount}: Looking for Telegram...`);
+      
+      if (typeof window === 'undefined') {
+        addDebugInfo('Window is undefined');
+        return false;
+      }
+      
+      if (!window.Telegram) {
+        addDebugInfo('window.Telegram is not available');
+        return false;
+      }
+      
+      if (!window.Telegram.WebApp) {
+        addDebugInfo('window.Telegram.WebApp is not available');
+        return false;
+      }
+      
+      addDebugInfo('Telegram WebApp found! Initializing...');
+      return true;
+    };
+    
+          const initTelegram = () => {
+        try {
+          if (checkTelegram() && window.Telegram?.WebApp) {
+            const tg = window.Telegram.WebApp;
             
-            // Configure main button
-            const mainButton = tg.MainButton;
-            mainButton.text = 'Send Message';
+            addDebugInfo(`Telegram version: ${tg.version || 'unknown'}`);
+            addDebugInfo(`Platform: ${tg.platform || 'unknown'}`);
+            addDebugInfo(`Color scheme: ${tg.colorScheme || 'unknown'}`);
+            addDebugInfo(`Viewport height: ${tg.viewportHeight || 'unknown'}`);
             
-            // Remove any existing click handlers
-            mainButton.offClick(sendMessage);
-            mainButton.onClick(sendMessage);
+            // Initialize Telegram Web App
+            tg.ready();
+            addDebugInfo('Telegram ready() called');
             
-            // Show/hide button based on message content
-            if (message.trim()) {
-              mainButton.show();
-            } else {
-              mainButton.hide();
+            if (mounted) {
+              setIsReady(true);
+              const userName = tg.initDataUnsafe?.user?.first_name || 'Unknown';
+              const userId = tg.initDataUnsafe?.user?.id || 'unknown';
+              addDebugInfo(`User: ${userName} (ID: ${userId})`);
+              addDebugInfo(`Init data: ${tg.initData ? 'present' : 'missing'}`);
+              
+              // Configure main button
+              const mainButton = tg.MainButton;
+              mainButton.text = 'Send Message';
+              
+              // Remove any existing click handlers
+              try {
+                mainButton.offClick(sendMessage);
+              } catch {
+                addDebugInfo('Note: offClick not available in this Telegram version');
+              }
+              
+              mainButton.onClick(sendMessage);
+              addDebugInfo('Main button configured');
+              
+              // Show/hide button based on message content
+              if (message.trim()) {
+                mainButton.show();
+                addDebugInfo('Main button shown');
+              } else {
+                mainButton.hide();
+                addDebugInfo('Main button hidden');
+              }
             }
-          }
         } else {
-          if (mounted) {
-            setDebugInfo('Telegram Web App not available. Are you running this in Telegram?');
-            setError('This app must be opened through a Telegram bot');
+          if (mounted && checkCount >= maxChecks) {
+            const errorMsg = 'Telegram Web App not available after 20 attempts. This app must be opened through a Telegram bot.';
+            setError(errorMsg);
+            addDebugInfo(errorMsg);
+            
+            // Check if we're in development
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+              addDebugInfo('DEVELOPMENT MODE DETECTED: Mini apps only work when deployed with HTTPS');
+            }
           }
         }
       } catch (err) {
         if (mounted) {
-          setError(`Initialization error: ${err}`);
+          const errorMsg = `Initialization error: ${err}`;
+          setError(errorMsg);
+          addDebugInfo(errorMsg);
         }
       }
     };
 
-    // Try immediate initialization
+    // Immediate check
     if (typeof window !== 'undefined') {
-      if (window.Telegram?.WebApp) {
+      addDebugInfo('Window is available, checking immediately...');
+      if (checkTelegram()) {
         initTelegram();
       } else {
-        // Wait a bit for the script to load
-        const timer = setTimeout(() => {
-          initTelegram();
+        // Retry every 100ms
+        const timer = setInterval(() => {
+          if (checkCount >= maxChecks) {
+            clearInterval(timer);
+            initTelegram(); // Final attempt with error handling
+            return;
+          }
+          
+          if (checkTelegram()) {
+            clearInterval(timer);
+            initTelegram();
+          }
         }, 100);
         
         return () => {
-          clearTimeout(timer);
+          clearInterval(timer);
           mounted = false;
         };
       }
@@ -123,17 +202,31 @@ export default function Home() {
   const testSend = () => {
     if (!isReady) {
       setError('Telegram not ready yet');
+      addDebugInfo('Send attempted but Telegram not ready');
       return;
     }
     sendMessage();
   };
 
+  const clearDebug = () => {
+    setDebugInfo([]);
+    setError('');
+  };
+
   return (
-    <div className="w-screen h-screen p-4 bg-white dark:bg-gray-900">
+    <div className="w-screen h-screen p-4 bg-white dark:bg-gray-900 overflow-auto">
       <div className="h-full flex flex-col gap-4">
-        <h1 className="text-xl font-bold text-black dark:text-white">
-          Todo List Bot
-        </h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl font-bold text-black dark:text-white">
+            Todo List Bot
+          </h1>
+          <button
+            onClick={clearDebug}
+            className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300"
+          >
+            Clear Debug
+          </button>
+        </div>
         
         {error && (
           <div className="p-3 bg-red-100 dark:bg-red-900 border border-red-400 rounded-lg">
@@ -142,7 +235,7 @@ export default function Home() {
         )}
         
         <textarea
-          className="flex-1 w-full resize-none border border-gray-300 dark:border-gray-600 rounded-lg outline-none p-4 text-base font-mono bg-white dark:bg-gray-800 text-black dark:text-white focus:border-blue-500 dark:focus:border-blue-400"
+          className="flex-1 w-full resize-none border border-gray-300 dark:border-gray-600 rounded-lg outline-none p-4 text-base font-mono bg-white dark:bg-gray-800 text-black dark:text-white focus:border-blue-500 dark:focus:border-blue-400 min-h-24"
           placeholder="Type your todo item or message here... (Ctrl/Cmd + Enter to send)"
           value={message}
           onChange={(e) => {
@@ -156,13 +249,8 @@ export default function Home() {
         <div className="flex justify-between items-center flex-wrap gap-2">
           <div className="flex flex-col">
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              {isReady ? '✓ Telegram Ready' : '⏳ Loading...'}
+              {isReady ? '✅ Telegram Ready' : '⏳ Loading...'}
             </span>
-            {debugInfo && (
-              <span className="text-xs text-gray-400 dark:text-gray-500">
-                {debugInfo}
-              </span>
-            )}
           </div>
           
           <button
@@ -177,11 +265,23 @@ export default function Home() {
         {!isReady && (
           <div className="text-sm text-gray-600 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <p><strong>Troubleshooting:</strong></p>
-                         <ul className="list-disc list-inside mt-1 space-y-1">
-               <li>Make sure you&apos;re opening this through a Telegram bot</li>
-               <li>Try refreshing the mini app</li>
-               <li>Check if your bot is properly configured</li>
-             </ul>
+            <ul className="list-disc list-inside mt-1 space-y-1">
+              <li>Make sure you&apos;re opening this through a Telegram bot</li>
+              <li>The app must be deployed with HTTPS (not localhost)</li>
+              <li>Check if your bot is properly configured with the mini app URL</li>
+              <li>Try refreshing the mini app</li>
+            </ul>
+          </div>
+        )}
+        
+        {debugInfo.length > 0 && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg max-h-40 overflow-y-auto">
+            <p className="font-semibold mb-2">Debug Log:</p>
+            {debugInfo.map((info, index) => (
+              <div key={index} className="mb-1 font-mono">
+                {info}
+              </div>
+            ))}
           </div>
         )}
       </div>
