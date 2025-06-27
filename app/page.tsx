@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 declare global {
   interface Window {
@@ -23,6 +23,12 @@ export default function Home() {
   const [message, setMessage] = useState('');
   const [isReady, setIsReady] = useState(false);
 
+  const sendMessage = useCallback(() => {
+    if (message.trim() && window.Telegram?.WebApp) {
+      window.Telegram.WebApp.sendData(message.trim());
+    }
+  }, [message]);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
@@ -39,13 +45,7 @@ export default function Home() {
         mainButton.hide();
       }
     }
-  }, [message]);
-
-  const sendMessage = () => {
-    if (message.trim() && window.Telegram?.WebApp) {
-      window.Telegram.WebApp.sendData(message.trim());
-    }
-  };
+  }, [message, sendMessage]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
