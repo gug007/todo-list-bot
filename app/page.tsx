@@ -24,76 +24,31 @@ export default function Home() {
   const [isReady, setIsReady] = useState(false);
 
   const sendMessage = useCallback(() => {
-    alert('sendMessage function called');
-    alert(`Message: "${message.trim()}"`);
-    alert(`Message length: ${message.trim().length}`);
-    alert(`window.Telegram exists: ${!!window.Telegram}`);
-    alert(`window.Telegram.WebApp exists: ${!!window.Telegram?.WebApp}`);
-    
     if (message.trim() && window.Telegram?.WebApp) {
-      alert('About to call Telegram WebApp sendData');
-      try {
-        window.Telegram.WebApp.sendData(message.trim());
-        alert('Successfully called sendData');
-      } catch (error) {
-        alert(`Error calling sendData: ${error}`);
-      }
-    } else {
-      if (!message.trim()) {
-        alert('Message is empty or whitespace only');
-      }
-      if (!window.Telegram?.WebApp) {
-        alert('Telegram WebApp not available');
-      }
+      window.Telegram.WebApp.sendData(message.trim());
     }
   }, [message]);
 
   useEffect(() => {
-    alert('useEffect running');
-    alert(`typeof window: ${typeof window}`);
-    alert(`window !== undefined: ${typeof window !== 'undefined'}`);
-    alert(`window.Telegram exists: ${!!window.Telegram}`);
-    alert(`window.Telegram?.WebApp exists: ${!!window.Telegram?.WebApp}`);
-    
     if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-      alert('Initializing Telegram WebApp');
-      try {
-        window.Telegram.WebApp.ready();
-        alert('Telegram WebApp ready() called successfully');
-        setIsReady(true);
-        alert('isReady set to true');
-        
-        // Configure main button
-        const mainButton = window.Telegram.WebApp.MainButton;
-        alert('Got MainButton reference');
-        mainButton.text = 'Send Message';
-        alert('Set MainButton text');
-        
-        mainButton.onClick(() => {
-          alert('MainButton clicked!');
-          sendMessage();
-        });
-        alert('Set MainButton onClick handler');
-        
-        if (message.trim()) {
-          mainButton.show();
-          alert('MainButton shown');
-        } else {
-          mainButton.hide();
-          alert('MainButton hidden');
-        }
-      } catch (error) {
-        alert(`Error in Telegram WebApp setup: ${error}`);
+      window.Telegram.WebApp.ready();
+      setIsReady(true);
+      
+      // Configure main button
+      const mainButton = window.Telegram.WebApp.MainButton;
+      mainButton.text = 'Send Message';
+      mainButton.onClick(() => sendMessage());
+      
+      if (message.trim()) {
+        mainButton.show();
+      } else {
+        mainButton.hide();
       }
-    } else {
-      alert('Telegram WebApp not available in useEffect');
     }
   }, [message, sendMessage]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    alert(`Key pressed: ${e.key}, metaKey: ${e.metaKey}, ctrlKey: ${e.ctrlKey}`);
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      alert('Ctrl/Cmd + Enter detected, calling sendMessage');
       sendMessage();
     }
   };
@@ -120,10 +75,7 @@ export default function Home() {
           </span>
           
           <button
-            onClick={() => {
-              alert('Send button clicked!');
-              sendMessage();
-            }}
+            onClick={sendMessage}
             disabled={!message.trim() || !isReady}
             className="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:text-gray-500 hover:bg-blue-600 transition-colors"
           >
