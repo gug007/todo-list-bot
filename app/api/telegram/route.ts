@@ -34,7 +34,8 @@ interface InlineQueryResult {
   reply_markup?: {
     inline_keyboard: Array<Array<{
       text: string;
-      web_app: {
+      url?: string;
+      web_app?: {
         url: string;
       };
     }>>;
@@ -95,9 +96,7 @@ export async function POST(request: NextRequest) {
         reply_markup: {
           inline_keyboard: [[{
             text: '📝 Open Todo App',
-            web_app: {
-              url: MINI_APP_URL
-            }
+            url: MINI_APP_URL
           }]]
         }
       });
