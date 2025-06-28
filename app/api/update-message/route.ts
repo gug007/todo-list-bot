@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
               [
                 {
                   text: "✏️ Edit Again",
-                  url: `${process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://your-app.vercel.app"}?edit=true&content=${encodeURIComponent(newText)}`,
+                  url: `${process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://your-app.vercel.app"}?edit=true&content=${encodeURIComponent(newText)}&messageId=${messageId}`,
                 },
               ],
             ],

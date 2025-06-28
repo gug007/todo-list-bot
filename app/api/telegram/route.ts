@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        if (messageIdToEdit) {
+        if (messageIdToEdit && messageIdToEdit !== 'PLACEHOLDER') {
           // Edit existing message
           console.log('Editing existing message:', messageIdToEdit);
           const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: chatId,
-              message_id: messageIdToEdit,
+              message_id: parseInt(messageIdToEdit),
               text: `✅ Updated Todo: ${todoData}`,
               reply_markup: {
                 inline_keyboard: [
@@ -133,10 +133,11 @@ export async function POST(request: NextRequest) {
             throw new Error('Edit failed, falling back to new message');
           } else {
             console.log('Successfully edited existing todo message');
+            return NextResponse.json({ success: true });
           }
         } else {
           // Send new message and store the message ID for future edits
-          throw new Error('No message ID provided, sending new message');
+          throw new Error('No valid message ID provided, sending new message');
         }
       } catch {
         console.log('Sending new todo message to chat:', chatId);
@@ -146,13 +147,13 @@ export async function POST(request: NextRequest) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: chatId,
-            text: `✅ Updated Todo: ${todoData}`,
+            text: `✅ Todo: ${todoData}`,
             reply_markup: {
               inline_keyboard: [
                 [
                   {
-                    text: "✏️ Edit Again",
-                    url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(todoData)}&userId=${update.message.from.id}&messageId=PLACEHOLDER`,
+                    text: "✏️ Edit Todo",
+                    url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(todoData)}&userId=${update.message.from.id}`,
                   },
                 ],
               ],
@@ -166,9 +167,11 @@ export async function POST(request: NextRequest) {
         } else {
           const responseData = await response.json();
           const newMessageId = responseData.result?.message_id;
+          console.log('New message sent with ID:', newMessageId);
+          
           if (newMessageId) {
             // Update the button with the actual message ID
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`, {
+            const updateResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -178,7 +181,7 @@ export async function POST(request: NextRequest) {
                   inline_keyboard: [
                     [
                       {
-                        text: "✏️ Edit Again",
+                        text: "✏️ Edit Todo",
                         url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(todoData)}&userId=${update.message.from.id}&messageId=${newMessageId}`,
                       },
                     ],
@@ -186,8 +189,15 @@ export async function POST(request: NextRequest) {
                 },
               }),
             });
+            
+            if (!updateResponse.ok) {
+              const updateErrorText = await updateResponse.text();
+              console.error("Error updating message buttons:", updateResponse.status, updateErrorText);
+            } else {
+              console.log('Successfully updated edit button with message ID:', newMessageId);
+            }
           }
-          console.log('Successfully sent updated todo message');
+          console.log('Successfully sent new todo message');
         }
       }
 

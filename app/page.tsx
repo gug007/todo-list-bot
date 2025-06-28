@@ -61,7 +61,15 @@ export default function Home() {
       const userIdParam = urlParams.get('userId');
       const messageIdParam = urlParams.get('messageId');
       
-      console.log('URL parsing:', { editMode, content, userId: userIdParam, messageId: messageIdParam, url: window.location.search });
+      console.log('URL parsing:', { 
+        editMode, 
+        content, 
+        decodedContent: content ? decodeURIComponent(content) : null,
+        userId: userIdParam, 
+        messageId: messageIdParam, 
+        url: window.location.search,
+        allParams: Object.fromEntries(urlParams.entries())
+      });
       
       if (editMode && content) {
         console.log('Setting edit mode with content:', decodeURIComponent(content));
@@ -75,7 +83,7 @@ export default function Home() {
         console.log('Found userId in URL:', userIdParam);
       }
       
-      if (messageIdParam && messageIdParam !== 'PLACEHOLDER') {
+      if (messageIdParam) {
         setMessageId(messageIdParam);
         console.log('Found messageId in URL:', messageIdParam);
       }
@@ -83,13 +91,20 @@ export default function Home() {
   }, []);
 
   const sendMessage = useCallback(async () => {
-    console.log('sendMessage called', { message: message.trim(), isEditMode, isInlineMode, messageId });
+    console.log('sendMessage called', { 
+      message: message.trim(), 
+      isEditMode, 
+      isInlineMode, 
+      messageId,
+      hasValidMessageId: !!(messageId && messageId !== 'PLACEHOLDER'),
+      originalContent
+    });
     
     if (message.trim()) {
       try {
-        if (isEditMode && messageId) {
-          // Edit mode with message ID - send JSON data for webhook to edit existing message
-          console.log('Edit mode with messageId: sending structured data for message editing');
+        if (isEditMode && messageId && messageId !== 'PLACEHOLDER') {
+          // Edit mode with valid message ID - send JSON data for webhook to edit existing message
+          console.log('Edit mode with valid messageId: sending structured data for message editing');
           
           if (window.Telegram?.WebApp) {
             const tg = window.Telegram.WebApp;
@@ -113,17 +128,17 @@ export default function Home() {
             }
           }, 500);
           
-        } else if (isEditMode && !messageId) {
-          // Edit mode without message ID - send simple data (will create new message)
-          console.log('Edit mode without messageId: sending simple data for new message');
+        } else if (isEditMode && (!messageId || messageId === 'PLACEHOLDER')) {
+          // Edit mode without valid message ID - create new message instead
+          console.log('Edit mode without valid messageId (null or PLACEHOLDER): creating new todo instead');
           
           if (window.Telegram?.WebApp) {
             const tg = window.Telegram.WebApp;
             tg.sendData(message.trim());
           }
           
-          setError('✅ Todo updated successfully!');
-          setTimeout(() => setError(''), 2000);
+          setError('✅ New todo created! (Original message could not be edited)');
+          setTimeout(() => setError(''), 3000);
           
           setTimeout(() => {
             console.log('Closing mini app');
