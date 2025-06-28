@@ -49,20 +49,37 @@ const MINI_APP_URL = process.env.NEXT_PUBLIC_VERCEL_URL
   : 'https://your-app.vercel.app'; // Fallback
 
 async function sendTelegramRequest(method: string, data: Record<string, unknown>) {
-  const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
+  console.log(`Making Telegram API request: ${method}`, JSON.stringify(data, null, 2));
   
-  if (!response.ok) {
-    console.error(`Telegram API error: ${response.status}`, await response.text());
-    throw new Error(`Telegram API error: ${response.status}`);
+  if (!BOT_TOKEN) {
+    throw new Error('BOT_TOKEN is not defined');
   }
   
-  return response.json();
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
+  console.log(`Request URL: ${url}`);
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    
+    const responseText = await response.text();
+    console.log(`Telegram API response status: ${response.status}`);
+    console.log(`Telegram API response: ${responseText}`);
+    
+    if (!response.ok) {
+      throw new Error(`Telegram API error: ${response.status} - ${responseText}`);
+    }
+    
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error('Error in sendTelegramRequest:', error);
+    throw error;
+  }
 }
 
 export async function POST(request: NextRequest) {
