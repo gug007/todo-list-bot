@@ -20,6 +20,9 @@ interface TelegramUpdate {
     chat: {
       id: number;
     };
+    web_app_data?: {
+      data: string;
+    };
   };
 }
 
@@ -62,6 +65,38 @@ export async function POST(request: NextRequest) {
 
     const update: TelegramUpdate = await request.json();
 
+    // Handle web app data (when mini app sends data back)
+    if (update.message?.web_app_data) {
+      const chatId = update.message.chat.id;
+      const data = update.message.web_app_data.data;
+      
+      try {
+        // Send the updated todo as a new message
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `✅ Updated Todo: ${data}`,
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: "✏️ Edit Again",
+                    url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(data)}`,
+                  },
+                ],
+              ],
+            },
+          }),
+        });
+      } catch (error) {
+        console.error("Error sending updated todo:", error);
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
     // Handle inline queries with fast response
     if (update.inline_query) {
       const query = update.inline_query.query;
@@ -83,22 +118,22 @@ export async function POST(request: NextRequest) {
             ? `✅ Todo: ${query}`
             : "✅ New todo item created",
         },
-                  reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: "📝 Open Todo App",
-                  url: MINI_APP_URL,
-                },
-              ],
-              [
-                {
-                  text: "✏️ Edit Todo",
-                  url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(query || "New todo item")}`,
-                },
-              ],
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "📝 Open Todo App",
+                web_app: { url: MINI_APP_URL },
+              },
             ],
-          },
+            [
+              {
+                text: "✏️ Edit Todo",
+                url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(query || "New todo item")}`,
+              },
+            ],
+          ],
+        },
       });
 
       // Respond to Telegram immediately

@@ -70,7 +70,14 @@ export default function Home() {
       try {
         const tg = window.Telegram.WebApp;
         
-        if (isInlineMode) {
+        if (isEditMode) {
+          // For edit mode, send data back to update the original message
+          tg.sendData(message.trim());
+          // Close the mini app after sending
+          setTimeout(() => {
+            tg.close();
+          }, 100);
+        } else if (isInlineMode) {
           // For inline mode, use switchInlineQuery
           tg.switchInlineQuery(message.trim(), ['users', 'groups', 'channels']);
         } else {
@@ -78,12 +85,14 @@ export default function Home() {
           tg.sendData(message.trim());
         }
         
-        setMessage(''); // Clear message after sending
+        if (!isEditMode) {
+          setMessage(''); // Clear message after sending (except in edit mode)
+        }
       } catch (err) {
         setError(`Failed to send: ${err}`);
       }
     }
-  }, [message, isInlineMode]);
+  }, [message, isInlineMode, isEditMode]);
 
   useEffect(() => {
     let mounted = true;
@@ -116,10 +125,10 @@ export default function Home() {
         // Setup main button
         const mainButton = tg.MainButton;
         mainButton.text = isEditMode 
-          ? 'Update Todo' 
+          ? '💾 Update Todo' 
           : hasQueryId 
-            ? 'Share in Chat' 
-            : 'Send Message';
+            ? '🔄 Share in Chat' 
+            : '📤 Send Message';
         
         try {
           mainButton.offClick(sendMessage);
