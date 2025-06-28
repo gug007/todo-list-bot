@@ -48,12 +48,6 @@ export default function Home() {
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState('');
   const [isInlineMode, setIsInlineMode] = useState(false);
-  const [editMode, setEditMode] = useState<{
-    messageId: string;
-    chatId: string;
-    originalText: string;
-  } | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
 
   // Function to get pre-filled text from URL params or Telegram Web App data
   const getPrefilledText = useCallback(() => {
@@ -62,19 +56,6 @@ export default function Home() {
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
         const textParam = urlParams.get('text');
-        const messageId = urlParams.get('messageId');
-        const chatId = urlParams.get('chatId');
-        const mode = urlParams.get('mode');
-
-        // Check if we're in edit mode
-        if (mode === 'edit' && messageId && chatId && textParam) {
-          setEditMode({
-            messageId,
-            chatId,
-            originalText: decodeURIComponent(textParam)
-          });
-        }
-
         if (textParam) {
           return decodeURIComponent(textParam);
         }
@@ -105,39 +86,6 @@ export default function Home() {
       return '';
     }
   }, []);
-
-  const saveChanges = useCallback(async () => {
-    if (!editMode || !message.trim() || isSaving) return;
-
-    setIsSaving(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/telegram', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messageId: editMode.messageId,
-          chatId: editMode.chatId,
-          text: message.trim()
-        })
-      });
-
-      if (response.ok) {
-        // Close the mini app after successful save
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.close();
-        }
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to save changes');
-      }
-    } catch (err) {
-      setError(`Save failed: ${err}`);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [editMode, message, isSaving]);
 
   const sendMessage = useCallback(() => {
     if (message.trim() && window.Telegram?.WebApp) {
@@ -195,30 +143,15 @@ export default function Home() {
         
         // Setup main button
         const mainButton = tg.MainButton;
+        mainButton.text = hasQueryId ? 'Share in Chat' : 'Send Message';
         
-        if (editMode) {
-          mainButton.text = 'Save Changes';
-          
-          try {
-            mainButton.offClick(sendMessage);
-            mainButton.offClick(saveChanges);
-          } catch {
-            // Ignore if not available
-          }
-          
-          mainButton.onClick(saveChanges);
-        } else {
-          mainButton.text = hasQueryId ? 'Share in Chat' : 'Send Message';
-          
-          try {
-            mainButton.offClick(sendMessage);
-            mainButton.offClick(saveChanges);
-          } catch {
-            // Ignore if not available
-          }
-          
-          mainButton.onClick(sendMessage);
+        try {
+          mainButton.offClick(sendMessage);
+        } catch {
+          // Ignore if not available
         }
+        
+        mainButton.onClick(sendMessage);
         
         // Show main button if there's pre-filled text or current message
         if (prefilledText || message.trim()) {
@@ -253,7 +186,7 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, [message, sendMessage, getPrefilledText, saveChanges, editMode]);
+  }, [message, sendMessage, getPrefilledText]);
 
   // Update main button visibility when message changes
   useEffect(() => {
@@ -269,15 +202,9 @@ export default function Home() {
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      if (editMode) {
-        saveChanges();
-      } else {
-        sendMessage();
-      }
+      sendMessage();
     }
   };
-
-  const hasChanges = editMode && message !== editMode.originalText;
 
   return (
     <div className="w-screen h-screen p-4 bg-white dark:bg-gray-900">
@@ -285,22 +212,16 @@ export default function Home() {
         {/* Header */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-black dark:text-white mb-2">
-            {editMode ? '✏️ Edit Todo' : isInlineMode ? '✍️ Create & Share Todo' : '📝 Todo Editor'}
+            {isInlineMode ? '✍️ Create & Share Todo' : '📝 Todo Editor'}
           </h1>
           
-          {editMode && isReady && (
-            <p className="text-blue-600 dark:text-blue-400 text-sm">
-              {hasChanges ? '📝 You have unsaved changes' : '✅ No changes made'}
-            </p>
-          )}
-          
-          {isInlineMode && isReady && !editMode && (
+          {isInlineMode && isReady && (
             <p className="text-blue-600 dark:text-blue-400 text-sm">
               Create your todo item and share it in the chat
             </p>
           )}
           
-          {message && isReady && !editMode && (
+          {message && isReady && (
             <p className="text-green-600 dark:text-green-400 text-sm">
               ✅ Message content loaded from Telegram
             </p>
@@ -323,13 +244,11 @@ export default function Home() {
           <textarea
             className="flex-1 w-full resize-none border-2 border-gray-300 dark:border-gray-600 rounded-xl outline-none p-4 text-lg bg-white dark:bg-gray-800 text-black dark:text-white focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
             placeholder={
-              editMode ?
-                "✏️ Edit your todo item..." :
-                message ? 
-                  "✍️ Edit your todo item..." :
-                  isInlineMode 
-                    ? "✍️ What todo would you like to create and share?" 
-                    : "✍️ Enter your todo item...\n\n💡 Tip: Send a message to the bot first to pre-fill this field!"
+              message ? 
+                "✍️ Edit your todo item..." :
+                isInlineMode 
+                  ? "✍️ What todo would you like to create and share?" 
+                  : "✍️ Enter your todo item...\n\n💡 Tip: Send a message to the bot first to pre-fill this field!"
             }
             value={message}
             onChange={(e) => {
@@ -348,11 +267,11 @@ export default function Home() {
             </div>
             
             <button
-              onClick={editMode ? saveChanges : sendMessage}
-              disabled={!message.trim() || !isReady || (editMode !== null && isSaving)}
+              onClick={sendMessage}
+              disabled={!message.trim() || !isReady}
               className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:text-gray-500 hover:bg-blue-600 transition-colors text-lg"
             >
-              {isSaving ? '💾 Saving...' : editMode ? '💾 Save Changes' : isInlineMode ? '🔄 Share' : '📤 Send'}
+              {isInlineMode ? '🔄 Share' : '📤 Send'}
             </button>
           </div>
         </div>
@@ -360,7 +279,7 @@ export default function Home() {
         {/* Tips */}
         <div className="text-center text-xs text-gray-500 dark:text-gray-400 mt-2">
           {isReady ? (
-            <p>💡 Press Cmd/Ctrl + Enter to {editMode ? 'save' : 'send'} quickly</p>
+            <p>💡 Press Cmd/Ctrl + Enter to send quickly</p>
           ) : (
             <p>🔄 Connecting to Telegram...</p>
           )}

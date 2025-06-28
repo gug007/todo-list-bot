@@ -156,54 +156,24 @@ export async function POST(request: NextRequest) {
       } else if (text && text !== "/start") {
         // Handle any other text message by creating a todo app link with pre-filled content
         try {
-          const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: chatId,
-              text: `✅ Todo: ${text}`,
+              text: `📝 Create a todo item: "${text}"`,
               reply_markup: {
                 inline_keyboard: [
                   [
                     {
-                      text: "✏️ Edit Todo",
-                      web_app: { url: `${MINI_APP_URL}?text=${encodeURIComponent(text)}&chatId=${chatId}&mode=edit` },
+                      text: "📝 Open Todo App",
+                      web_app: { url: `${MINI_APP_URL}?text=${encodeURIComponent(text)}` },
                     },
                   ],
                 ],
               },
             }),
           });
-
-          // Get the message ID from the response for future editing
-          if (response.ok) {
-            const result = await response.json();
-            if (result.result?.message_id) {
-              const messageId = result.result.message_id;
-              
-              // Update the message to include the message ID for editing
-              await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  chat_id: chatId,
-                  message_id: messageId,
-                  reply_markup: {
-                    inline_keyboard: [
-                      [
-                        {
-                          text: "✏️ Edit Todo",
-                          web_app: { 
-                            url: `${MINI_APP_URL}?text=${encodeURIComponent(text)}&messageId=${messageId}&chatId=${chatId}&mode=edit`
-                          },
-                        },
-                      ],
-                    ],
-                  },
-                }),
-              });
-            }
-          }
         } catch (error) {
           console.error("Error sending message response:", error);
         }
@@ -215,69 +185,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Webhook error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  try {
-    if (!BOT_TOKEN) {
-      return NextResponse.json(
-        { error: "Bot token not configured" },
-        { status: 500 }
-      );
-    }
-
-    const { messageId, chatId, text } = await request.json();
-
-    if (!messageId || !chatId || !text) {
-      return NextResponse.json(
-        { error: "Missing required fields: messageId, chatId, text" },
-        { status: 400 }
-      );
-    }
-
-    // Edit the message using Telegram Bot API
-    const response = await fetch(
-      `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          message_id: messageId,
-          text: `✅ Todo: ${text}`,
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: "✏️ Edit Again",
-                  web_app: { 
-                    url: `${MINI_APP_URL}?text=${encodeURIComponent(text)}&messageId=${messageId}&chatId=${chatId}&mode=edit`
-                  },
-                },
-              ],
-            ],
-          },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Telegram edit message error:", response.status, errorText);
-      return NextResponse.json(
-        { error: "Failed to edit message" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Edit message error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
