@@ -141,6 +141,8 @@ export async function POST(request: NextRequest) {
         }
       } catch {
         console.log('Sending new todo message to chat:', chatId);
+        console.log('Initial edit URL (without messageId):', `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(todoData)}&userId=${update.message.from.id}`);
+        
         // Send the updated todo as a new message
         const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: "POST",
@@ -170,6 +172,9 @@ export async function POST(request: NextRequest) {
           console.log('New message sent with ID:', newMessageId);
           
           if (newMessageId) {
+            const updatedEditUrl = `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(todoData)}&userId=${update.message.from.id}&messageId=${newMessageId}`;
+            console.log('Updating edit URL with messageId:', updatedEditUrl);
+            
             // Update the button with the actual message ID
             const updateResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`, {
               method: "POST",
@@ -182,7 +187,7 @@ export async function POST(request: NextRequest) {
                     [
                       {
                         text: "✏️ Edit Todo",
-                        url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(todoData)}&userId=${update.message.from.id}&messageId=${newMessageId}`,
+                        url: updatedEditUrl,
                       },
                     ],
                   ],

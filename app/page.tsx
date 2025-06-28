@@ -68,8 +68,16 @@ export default function Home() {
         userId: userIdParam, 
         messageId: messageIdParam, 
         url: window.location.search,
+        fullUrl: window.location.href,
         allParams: Object.fromEntries(urlParams.entries())
       });
+      
+      // Special logging for edit mode without messageId
+      if (editMode && !messageIdParam) {
+        console.warn('⚠️ Edit mode detected but no messageId in URL! This will create a new message instead of editing.');
+        console.warn('Expected URL format: ?edit=true&content=...&messageId=123');
+        console.warn('Actual URL:', window.location.href);
+      }
       
       if (editMode && content) {
         console.log('Setting edit mode with content:', decodeURIComponent(content));
@@ -300,9 +308,17 @@ export default function Home() {
           </h1>
           
           {isEditMode && isReady && (
-            <p className="text-blue-600 dark:text-blue-400 text-sm">
-              Edit your todo item
-            </p>
+            <div className="text-sm">
+              {messageId && messageId !== 'PLACEHOLDER' ? (
+                <p className="text-blue-600 dark:text-blue-400">
+                  ✏️ Edit your todo item
+                </p>
+              ) : (
+                <p className="text-orange-600 dark:text-orange-400">
+                  ⚠️ Editing original message (will create new todo instead)
+                </p>
+              )}
+            </div>
           )}
           
           {isInlineMode && isReady && !isEditMode && (
@@ -319,7 +335,21 @@ export default function Home() {
         {/* Error message */}
         {error && (
           <div className="p-3 bg-red-100 dark:bg-red-900 border border-red-400 rounded-lg">
-            <p className="text-red-700 dark:text-red-300 text-sm">❌ {error}</p>
+            <p className="text-red-700 dark:text-red-300 text-sm">
+              {error.startsWith('✅') ? '✅' : '❌'} {error.replace(/^[✅❌]\s*/, '')}
+            </p>
+          </div>
+        )}
+
+        {/* Debug info for edit mode without messageId */}
+        {isEditMode && (!messageId || messageId === 'PLACEHOLDER') && (
+          <div className="p-3 bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 rounded-lg">
+            <p className="text-yellow-700 dark:text-yellow-300 text-sm">
+              🐛 <strong>Debug info:</strong> Edit mode without valid messageId
+            </p>
+            <p className="text-yellow-600 dark:text-yellow-400 text-xs mt-1">
+              MessageId: {messageId || 'null'} | This will create a new todo instead of editing
+            </p>
           </div>
         )}
         
