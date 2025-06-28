@@ -5,7 +5,7 @@ import { useState } from 'react';
 interface SetupResult {
   step: string;
   success: boolean;
-  data?: any;
+  data?: Record<string, unknown> | unknown[] | string | number | boolean | null;
   error?: string;
 }
 

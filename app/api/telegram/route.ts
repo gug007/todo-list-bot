@@ -48,7 +48,7 @@ const MINI_APP_URL = process.env.NEXT_PUBLIC_VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
   : 'https://your-app.vercel.app'; // Fallback
 
-async function sendTelegramRequest(method: string, data: any) {
+async function sendTelegramRequest(method: string, data: Record<string, unknown>) {
   const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
     method: 'POST',
     headers: {

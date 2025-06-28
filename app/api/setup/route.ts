@@ -7,7 +7,7 @@ const WEBHOOK_URL = process.env.NEXT_PUBLIC_VERCEL_URL
   ? `https://${process.env.VERCEL_URL}/api/telegram`
   : null;
 
-async function telegramRequest(method: string, data: any = {}) {
+async function telegramRequest(method: string, data: Record<string, unknown> = {}) {
   const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
     method: 'POST',
     headers: {
@@ -25,7 +25,7 @@ async function telegramRequest(method: string, data: any = {}) {
   return result;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     if (!BOT_TOKEN) {
       return NextResponse.json({ 
