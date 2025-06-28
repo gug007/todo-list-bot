@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
                 [
                   {
                     text: "✏️ Edit Again",
-                    url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(data)}`,
+                    url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(data)}&userId=${update.message.from.id}`,
                   },
                 ],
               ],
@@ -134,6 +134,7 @@ export async function POST(request: NextRequest) {
     if (update.inline_query) {
       const query = update.inline_query.query;
       const queryId = update.inline_query.id;
+      const userId = update.inline_query.from.id;
 
       // Build response quickly
       const results: InlineQueryResult[] = [];
@@ -162,7 +163,7 @@ export async function POST(request: NextRequest) {
             [
               {
                 text: "✏️ Edit Todo",
-                url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(query || "New todo item")}`,
+                url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(query || "New todo item")}&userId=${userId}`,
               },
             ],
           ],

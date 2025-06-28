@@ -49,6 +49,7 @@ export default function Home() {
   const [isInlineMode, setIsInlineMode] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [originalContent, setOriginalContent] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Parse URL parameters on component mount
   useEffect(() => {
@@ -56,14 +57,20 @@ export default function Home() {
       const urlParams = new URLSearchParams(window.location.search);
       const editMode = urlParams.get('edit') === 'true';
       const content = urlParams.get('content');
+      const userIdParam = urlParams.get('userId');
       
-      console.log('URL parsing:', { editMode, content, url: window.location.search });
+      console.log('URL parsing:', { editMode, content, userId: userIdParam, url: window.location.search });
       
       if (editMode && content) {
         console.log('Setting edit mode with content:', decodeURIComponent(content));
         setIsEditMode(true);
         setOriginalContent(decodeURIComponent(content));
         setMessage(decodeURIComponent(content));
+      }
+      
+      if (userIdParam) {
+        setUserId(userIdParam);
+        console.log('Found userId in URL:', userIdParam);
       }
     }
   }, []);
@@ -86,17 +93,18 @@ export default function Home() {
           // Method 2: Try direct API call as fallback
           try {
             console.log('Method 2: Sending direct API call');
-            const response = await fetch('/api/update-todo', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                content: message.trim(),
-                originalContent: originalContent,
-                initData: window.Telegram?.WebApp?.initData || '',
-              }),
-            });
+                         const response = await fetch('/api/update-todo', {
+               method: 'POST',
+               headers: {
+                 'Content-Type': 'application/json',
+               },
+               body: JSON.stringify({
+                 content: message.trim(),
+                 originalContent: originalContent,
+                 userId: userId,
+                 initData: window.Telegram?.WebApp?.initData || '',
+               }),
+             });
             
             const result = await response.json();
             console.log('Direct API response:', result);
@@ -144,7 +152,7 @@ export default function Home() {
         hasTelegram: !!window.Telegram?.WebApp 
       });
     }
-  }, [message, isInlineMode, isEditMode, originalContent]);
+  }, [message, isInlineMode, isEditMode, originalContent, userId]);
 
   useEffect(() => {
     let mounted = true;

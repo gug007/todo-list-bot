@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { content, originalContent, initData } = await request.json();
+    const { content, originalContent, userId, initData } = await request.json();
 
     if (!content) {
       return NextResponse.json(
@@ -25,17 +25,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Update todo request:', { content, originalContent, hasInitData: !!initData });
+    console.log('Update todo request:', { content, originalContent, userId, hasInitData: !!initData });
 
-    // Try to extract user ID from initData if available
-    let userId = null;
-    if (initData) {
+    // Use the provided userId, or try to extract from initData as fallback
+    let finalUserId = userId;
+    if (!finalUserId && initData) {
       try {
         const urlParams = new URLSearchParams(initData);
         const userParam = urlParams.get('user');
         if (userParam) {
           const userObj = JSON.parse(userParam);
-          userId = userObj.id;
+          finalUserId = userObj.id;
         }
       } catch {
         console.log('Could not parse user data from initData');
@@ -43,20 +43,20 @@ export async function POST(request: NextRequest) {
     }
 
     // If we have a user ID, send them a notification
-    if (userId) {
+    if (finalUserId) {
       try {
         const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            chat_id: userId,
+            chat_id: finalUserId,
             text: `✅ Todo Updated!\n\nOld: ${originalContent || 'N/A'}\nNew: ${content}`,
             reply_markup: {
               inline_keyboard: [
                 [
                   {
                     text: "✏️ Edit Again",
-                    url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(content)}`,
+                    url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(content)}&userId=${finalUserId}`,
                   },
                 ],
               ],
@@ -84,7 +84,9 @@ export async function POST(request: NextRequest) {
       success: true, 
       message: "Todo updated successfully",
       debug: {
-        hasUserId: !!userId
+        hasUserId: !!finalUserId,
+        providedUserId: !!userId,
+        extractedFromInitData: !userId && !!finalUserId
       }
     });
 
