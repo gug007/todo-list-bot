@@ -24,6 +24,17 @@ interface TelegramUpdate {
       data: string;
     };
   };
+  web_app_data?: {
+    data: string;
+  };
+  callback_query?: {
+    id: string;
+    from: {
+      id: number;
+      first_name: string;
+    };
+    data?: string;
+  };
 }
 
 interface InlineQueryResult {
@@ -64,15 +75,20 @@ export async function POST(request: NextRequest) {
     }
 
     const update: TelegramUpdate = await request.json();
+    
+    // Debug: Log all incoming updates
+    console.log('Webhook received update:', JSON.stringify(update, null, 2));
 
     // Handle web app data (when mini app sends data back)
     if (update.message?.web_app_data) {
+      console.log('Found web_app_data in message:', update.message.web_app_data);
       const chatId = update.message.chat.id;
       const data = update.message.web_app_data.data;
       
       try {
+        console.log('Sending updated todo message to chat:', chatId);
         // Send the updated todo as a new message
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -90,11 +106,28 @@ export async function POST(request: NextRequest) {
             },
           }),
         });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Error sending message:", response.status, errorText);
+        } else {
+          console.log('Successfully sent updated todo message');
+        }
       } catch (error) {
         console.error("Error sending updated todo:", error);
       }
 
       return NextResponse.json({ success: true });
+    }
+    
+    // Check for other possible web app data formats
+    if (update.web_app_data) {
+      console.log('Found web_app_data at root level:', update.web_app_data);
+    }
+    
+    // Check for callback query from mini app
+    if (update.callback_query?.data) {
+      console.log('Found callback query:', update.callback_query);
     }
 
     // Handle inline queries with fast response
@@ -183,6 +216,12 @@ export async function POST(request: NextRequest) {
                     {
                       text: "📝 Open Todo App",
                       web_app: { url: MINI_APP_URL },
+                    },
+                  ],
+                  [
+                    {
+                      text: "ℹ️ How to use inline mode",
+                      url: "https://core.telegram.org/bots/inline",
                     },
                   ],
                 ],

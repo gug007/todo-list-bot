@@ -68,35 +68,72 @@ export default function Home() {
     }
   }, []);
 
-  const sendMessage = useCallback(() => {
+  const sendMessage = useCallback(async () => {
     console.log('sendMessage called', { message: message.trim(), isEditMode, isInlineMode });
     
-    if (message.trim() && window.Telegram?.WebApp) {
+    if (message.trim()) {
       try {
-        const tg = window.Telegram.WebApp;
-        
         if (isEditMode) {
-          console.log('Edit mode: sending data', message.trim());
-          // For edit mode, send data back to update the original message
-          tg.sendData(message.trim());
+          console.log('Edit mode: attempting multiple update methods');
+          
+          // Method 1: Try the standard Telegram WebApp sendData if available
+          if (window.Telegram?.WebApp) {
+            const tg = window.Telegram.WebApp;
+            console.log('Method 1: Sending data via Telegram WebApp');
+            tg.sendData(message.trim());
+          }
+          
+          // Method 2: Try direct API call as fallback
+          try {
+            console.log('Method 2: Sending direct API call');
+            const response = await fetch('/api/update-todo', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                content: message.trim(),
+                originalContent: originalContent,
+                initData: window.Telegram?.WebApp?.initData || '',
+              }),
+            });
+            
+            const result = await response.json();
+            console.log('Direct API response:', result);
+            
+            if (result.success) {
+              // Success feedback
+              setError('✅ Todo updated successfully!');
+              setTimeout(() => setError(''), 2000);
+            }
+          } catch (apiError) {
+            console.error('Direct API call failed:', apiError);
+          }
+          
           // Close the mini app after sending
           setTimeout(() => {
             console.log('Closing mini app');
-            tg.close();
-          }, 100);
-        } else if (isInlineMode) {
-          console.log('Inline mode: switching query');
-          // For inline mode, use switchInlineQuery
-          tg.switchInlineQuery(message.trim(), ['users', 'groups', 'channels']);
-        } else {
-          console.log('Regular mode: sending data');
-          // For regular mini apps, use sendData
-          tg.sendData(message.trim());
+            if (window.Telegram?.WebApp) {
+              window.Telegram.WebApp.close();
+            }
+          }, 500);
+          
+        } else if (window.Telegram?.WebApp) {
+          const tg = window.Telegram.WebApp;
+          
+          if (isInlineMode) {
+            console.log('Inline mode: switching query');
+            // For inline mode, use switchInlineQuery
+            tg.switchInlineQuery(message.trim(), ['users', 'groups', 'channels']);
+          } else {
+            console.log('Regular mode: sending data');
+            // For regular mini apps, use sendData
+            tg.sendData(message.trim());
+          }
+          
+          setMessage(''); // Clear message after sending
         }
         
-        if (!isEditMode) {
-          setMessage(''); // Clear message after sending (except in edit mode)
-        }
       } catch (err) {
         console.error('Error in sendMessage:', err);
         setError(`Failed to send: ${err}`);
@@ -107,7 +144,7 @@ export default function Home() {
         hasTelegram: !!window.Telegram?.WebApp 
       });
     }
-  }, [message, isInlineMode, isEditMode]);
+  }, [message, isInlineMode, isEditMode, originalContent]);
 
   useEffect(() => {
     let mounted = true;
