@@ -88,7 +88,9 @@ export async function POST(request: NextRequest) {
             [
               {
                 text: "📝 Open Todo List",
-                url: MINI_APP_URL,
+                url: query 
+                  ? `${MINI_APP_URL}?text=${encodeURIComponent(query)}`
+                  : MINI_APP_URL,
               },
             ],
           ],
@@ -150,6 +152,30 @@ export async function POST(request: NextRequest) {
           });
         } catch (error) {
           console.error("Error sending start message:", error);
+        }
+      } else if (text && text !== "/start") {
+        // Handle any other text message by creating a todo app link with pre-filled content
+        try {
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: `📝 Create a todo item: "${text}"`,
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "📝 Open Todo App",
+                      web_app: { url: `${MINI_APP_URL}?text=${encodeURIComponent(text)}` },
+                    },
+                  ],
+                ],
+              },
+            }),
+          });
+        } catch (error) {
+          console.error("Error sending message response:", error);
         }
       }
 
