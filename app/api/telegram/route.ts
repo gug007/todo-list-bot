@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
             [
               {
                 text: "📝 Open Todo App",
-                web_app: { url: MINI_APP_URL },
+                url: MINI_APP_URL,
               },
             ],
             [
