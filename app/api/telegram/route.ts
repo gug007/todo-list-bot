@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
           inline_keyboard: [
             [
               {
-                text: "📝 Open Todo App",
+                text: "📝 Open Todo List",
                 url: MINI_APP_URL,
               },
             ],
