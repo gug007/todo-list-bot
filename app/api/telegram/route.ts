@@ -293,9 +293,18 @@ export async function POST(request: NextRequest) {
       const chatId = message.chat.id;
       const text = message.text;
 
+      // Log all regular messages for debugging
+      console.log('Regular message received:', {
+        messageId: message.message_id,
+        text,
+        chatId,
+        userId: message.from.id
+      });
+
       // Check if this is a message posted from inline query result (starts with "✅ Todo:" or "✅ New todo item")
       if (text && (text.startsWith("✅ Todo:") || text.startsWith("✅ New todo item"))) {
-        console.log('Detected message from inline query result, updating edit button with messageId');
+        console.log('✅ Detected message from inline query result, updating edit button with messageId');
+        console.log('Message details:', { text, messageId: message.message_id, chatId, userId: message.from.id });
         
         // Extract todo content
         let todoContent = "New todo item";

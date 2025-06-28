@@ -350,6 +350,9 @@ export default function Home() {
             <p className="text-yellow-600 dark:text-yellow-400 text-xs mt-1">
               MessageId: {messageId || 'null'} | This will create a new todo instead of editing
             </p>
+            <p className="text-yellow-600 dark:text-yellow-400 text-xs mt-1">
+              💡 <strong>Tip:</strong> If you just created this todo, wait a few seconds for the edit button to update, then try again
+            </p>
           </div>
         )}
         
