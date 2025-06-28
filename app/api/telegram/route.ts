@@ -6,7 +6,6 @@ interface TelegramUpdate {
     from: {
       id: number;
       first_name: string;
-      username?: string;
     };
     query: string;
     offset: string;
@@ -25,17 +24,6 @@ interface TelegramUpdate {
       data: string;
     };
   };
-  web_app_data?: {
-    data: string;
-  };
-  callback_query?: {
-    id: string;
-    from: {
-      id: number;
-      first_name: string;
-    };
-    data?: string;
-  };
 }
 
 interface InlineQueryResult {
@@ -51,9 +39,6 @@ interface InlineQueryResult {
       Array<{
         text: string;
         url?: string;
-        web_app?: {
-          url: string;
-        };
       }>
     >;
   };
@@ -240,16 +225,6 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json({ success: true });
-    }
-
-    // Check for other possible web app data formats
-    if (update.web_app_data) {
-      console.log("Found web_app_data at root level:", update.web_app_data);
-    }
-
-    // Check for callback query from mini app
-    if (update.callback_query?.data) {
-      console.log("Found callback query:", update.callback_query);
     }
 
     // Handle inline queries with fast response
