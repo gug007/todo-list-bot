@@ -54,66 +54,119 @@ const MINI_APP_URL = process.env.NEXT_PUBLIC_VERCEL_URL
 export async function POST(request: NextRequest) {
   try {
     if (!BOT_TOKEN) {
-      return NextResponse.json(
-        { error: "Bot token not configured" },
-        { status: 500 }
-      );
+      console.error("❌ Bot token not configured");
+      return NextResponse.json({ success: true }); // Return success to avoid webhook errors
     }
 
-    const update: TelegramUpdate = await request.json();
+    let update: TelegramUpdate;
+    try {
+      update = await request.json();
+    } catch (jsonError) {
+      console.error("❌ Failed to parse JSON:", jsonError);
+      return NextResponse.json({ success: true }); // Return success to avoid Telegram errors
+    }
 
     // Debug: Log all incoming updates
     console.log("Webhook received update:", JSON.stringify(update, null, 2));
 
-    // Handle web app data (when mini app sends data back)
-    if (update.message?.web_app_data) {
-      console.log(
-        "Found web_app_data in message:",
-        update.message.web_app_data
-      );
-      const chatId = update.message.chat.id;
-      const webAppData = update.message.web_app_data.data;
+    // Wrap all processing in error handling to prevent 500 errors
+    try {
+      // Handle web app data (when mini app sends data back)
+      if (update.message?.web_app_data) {
+        console.log(
+          "Found web_app_data in message:",
+          update.message.web_app_data
+        );
+        const chatId = update.message.chat.id;
+        const webAppData = update.message.web_app_data.data;
 
-      // Try to parse the data to see if it contains a message ID to edit
-      let todoData = webAppData;
-      let messageIdToEdit = null;
+        // Try to parse the data to see if it contains a message ID to edit
+        let todoData = webAppData;
+        let messageIdToEdit = null;
 
-      try {
-        const parsedData = JSON.parse(webAppData);
-        if (parsedData.content) {
-          todoData = parsedData.content;
+        try {
+          const parsedData = JSON.parse(webAppData);
+          if (parsedData.content) {
+            todoData = parsedData.content;
+          }
+          if (parsedData.messageId) {
+            messageIdToEdit = parsedData.messageId;
+          }
+        } catch {
+          // If parsing fails, treat the entire data as todo content
+          todoData = webAppData;
         }
-        if (parsedData.messageId) {
-          messageIdToEdit = parsedData.messageId;
-        }
-      } catch {
-        // If parsing fails, treat the entire data as todo content
-        todoData = webAppData;
-      }
 
-      try {
-        if (messageIdToEdit && messageIdToEdit !== "PLACEHOLDER") {
-          // Edit existing message
-          console.log("Editing existing message:", messageIdToEdit);
+        try {
+          if (messageIdToEdit && messageIdToEdit !== "PLACEHOLDER") {
+            // Edit existing message
+            console.log("Editing existing message:", messageIdToEdit);
+            const response = await fetch(
+              `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  message_id: parseInt(messageIdToEdit),
+                  text: `✅ Updated Todo: ${todoData}`,
+                  reply_markup: {
+                    inline_keyboard: [
+                      [
+                        {
+                          text: "✏️ Edit Again",
+                          url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
+                            todoData
+                          )}&userId=${
+                            update.message.from.id
+                          }&messageId=${messageIdToEdit}`,
+                        },
+                      ],
+                    ],
+                  },
+                }),
+              }
+            );
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error("Error editing message:", response.status, errorText);
+              // If edit fails, fall back to sending a new message
+              throw new Error("Edit failed, falling back to new message");
+            } else {
+              console.log("Successfully edited existing todo message");
+              return NextResponse.json({ success: true });
+            }
+          } else {
+            // Send new message and store the message ID for future edits
+            throw new Error("No valid message ID provided, sending new message");
+          }
+        } catch {
+          console.log("Sending new todo message to chat:", chatId);
+          console.log(
+            "Initial edit URL (without messageId):",
+            `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
+              todoData
+            )}&userId=${update.message.from.id}`
+          );
+
+          // Send the updated todo as a new message
           const response = await fetch(
-            `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`,
+            `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 chat_id: chatId,
-                message_id: parseInt(messageIdToEdit),
-                text: `✅ Updated Todo: ${todoData}`,
+                text: `✅ Todo: ${todoData}`,
                 reply_markup: {
                   inline_keyboard: [
                     [
                       {
-                        text: "✏️ Edit Again",
+                        text: "✏️ Edit Todo",
                         url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
                           todoData
-                        )}&userId=${
-                          update.message.from.id
-                        }&messageId=${messageIdToEdit}`,
+                        )}&userId=${update.message.from.id}`,
                       },
                     ],
                   ],
@@ -124,66 +177,173 @@ export async function POST(request: NextRequest) {
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error("Error editing message:", response.status, errorText);
-            // If edit fails, fall back to sending a new message
-            throw new Error("Edit failed, falling back to new message");
+            console.error("Error sending message:", response.status, errorText);
           } else {
-            console.log("Successfully edited existing todo message");
-            return NextResponse.json({ success: true });
-          }
-        } else {
-          // Send new message and store the message ID for future edits
-          throw new Error("No valid message ID provided, sending new message");
-        }
-      } catch {
-        console.log("Sending new todo message to chat:", chatId);
-        console.log(
-          "Initial edit URL (without messageId):",
-          `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
-            todoData
-          )}&userId=${update.message.from.id}`
-        );
+            const responseData = await response.json();
+            const newMessageId = responseData.result?.message_id;
+            console.log("New message sent with ID:", newMessageId);
 
-        // Send the updated todo as a new message
-        const response = await fetch(
-          `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: `✅ Todo: ${todoData}`,
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    {
-                      text: "✏️ Edit Todo",
-                      url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
-                        todoData
-                      )}&userId=${update.message.from.id}`,
+            if (newMessageId) {
+              const updatedEditUrl = `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
+                todoData
+              )}&userId=${update.message.from.id}&messageId=${newMessageId}`;
+              console.log("Updating edit URL with messageId:", updatedEditUrl);
+
+              // Update the button with the actual message ID
+              const updateResponse = await fetch(
+                `https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    chat_id: chatId,
+                    message_id: newMessageId,
+                    reply_markup: {
+                      inline_keyboard: [
+                        [
+                          {
+                            text: "✏️ Edit Todo",
+                            url: updatedEditUrl,
+                          },
+                        ],
+                      ],
                     },
-                  ],
-                ],
-              },
-            }),
+                  }),
+                }
+              );
+
+              if (!updateResponse.ok) {
+                const updateErrorText = await updateResponse.text();
+                console.error(
+                  "Error updating message buttons:",
+                  updateResponse.status,
+                  updateErrorText
+                );
+              } else {
+                console.log(
+                  "Successfully updated edit button with message ID:",
+                  newMessageId
+                );
+              }
+            }
+            console.log("Successfully sent new todo message");
           }
-        );
+        }
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Error sending message:", response.status, errorText);
-        } else {
-          const responseData = await response.json();
-          const newMessageId = responseData.result?.message_id;
-          console.log("New message sent with ID:", newMessageId);
+        return NextResponse.json({ success: true });
+      }
 
-          if (newMessageId) {
-            const updatedEditUrl = `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
-              todoData
-            )}&userId=${update.message.from.id}&messageId=${newMessageId}`;
-            console.log("Updating edit URL with messageId:", updatedEditUrl);
+      // Handle inline queries with fast response
+      if (update.inline_query) {
+        const query = update.inline_query.query;
+        const queryId = update.inline_query.id;
+        const userId = update.inline_query.from.id;
 
-            // Update the button with the actual message ID
+        // Build response quickly
+        const results: InlineQueryResult[] = [];
+
+        // Always add mini app option
+        results.push({
+          type: "article",
+          id: "create_todo",
+          title: "📝 Create Todo List",
+          description: query
+            ? `Create todo: "${query}"`
+            : "Open mini app to create a new todo item",
+          input_message_content: {
+            message_text: query
+              ? `✅ Todo: ${query}`
+              : "✅ New todo item created",
+          },
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "✏️ Edit Todo",
+                  url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
+                    query || "New todo item"
+                  )}&userId=${userId}`,
+                },
+              ],
+            ],
+          },
+        });
+
+        // Respond to Telegram immediately
+        try {
+          const response = await fetch(
+            `https://api.telegram.org/bot${BOT_TOKEN}/answerInlineQuery`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                inline_query_id: queryId,
+                results: results,
+                cache_time: 0,
+                is_personal: true,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Telegram API error:", response.status, errorText);
+          }
+        } catch (error) {
+          console.error("Error responding to inline query:", error);
+        }
+
+        return NextResponse.json({ success: true });
+      }
+
+      // Handle regular messages
+      if (update.message) {
+        const message = update.message;
+        const chatId = message.chat.id;
+        const text = message.text;
+
+        // Log all regular messages for debugging
+        console.log("Regular message received:", {
+          messageId: message.message_id,
+          text,
+          chatId,
+          userId: message.from.id,
+        });
+
+        // Check if this is a message posted from inline query result (starts with "✅ Todo:" or "✅ New todo item")
+        if (
+          text &&
+          (text.startsWith("✅ Todo:") || text.startsWith("✅ New todo item"))
+        ) {
+          console.log(
+            "✅ Detected message from inline query result, updating edit button with messageId"
+          );
+          console.log("Message details:", {
+            text,
+            messageId: message.message_id,
+            chatId,
+            userId: message.from.id,
+          });
+
+          // Extract todo content
+          let todoContent = "New todo item";
+          if (text.startsWith("✅ Todo: ")) {
+            todoContent = text.replace("✅ Todo: ", "").trim();
+          } else if (text.startsWith("✅ New todo item created")) {
+            todoContent = "New todo item";
+          }
+          const messageId = message.message_id;
+          const userId = message.from.id;
+
+          console.log("Updating inline result message with proper edit URL:", {
+            chatId,
+            messageId,
+            todoContent,
+            userId,
+          });
+
+          // Update the message's edit button to include the messageId
+          try {
             const updateResponse = await fetch(
               `https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`,
               {
@@ -191,13 +351,15 @@ export async function POST(request: NextRequest) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   chat_id: chatId,
-                  message_id: newMessageId,
+                  message_id: messageId,
                   reply_markup: {
                     inline_keyboard: [
                       [
                         {
                           text: "✏️ Edit Todo",
-                          url: updatedEditUrl,
+                          url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
+                            todoContent
+                          )}&userId=${userId}&messageId=${messageId}`,
                         },
                       ],
                     ],
@@ -209,214 +371,60 @@ export async function POST(request: NextRequest) {
             if (!updateResponse.ok) {
               const updateErrorText = await updateResponse.text();
               console.error(
-                "Error updating message buttons:",
+                "Error updating inline result message buttons:",
                 updateResponse.status,
                 updateErrorText
               );
             } else {
               console.log(
-                "Successfully updated edit button with message ID:",
-                newMessageId
+                "Successfully updated inline result edit button with messageId:",
+                messageId
               );
             }
+          } catch (error) {
+            console.error("Error updating inline result message buttons:", error);
           }
-          console.log("Successfully sent new todo message");
+
+          return NextResponse.json({ success: true });
         }
-      }
 
-      return NextResponse.json({ success: true });
-    }
-
-    // Handle inline queries with fast response
-    if (update.inline_query) {
-      const query = update.inline_query.query;
-      const queryId = update.inline_query.id;
-      const userId = update.inline_query.from.id;
-
-      // Build response quickly
-      const results: InlineQueryResult[] = [];
-
-      // Always add mini app option
-      results.push({
-        type: "article",
-        id: "create_todo",
-        title: "📝 Create Todo List",
-        description: query
-          ? `Create todo: "${query}"`
-          : "Open mini app to create a new todo item",
-        input_message_content: {
-          message_text: query
-            ? `✅ Todo: ${query}`
-            : "✅ New todo item created",
-        },
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "✏️ Edit Todo",
-                url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
-                  query || "New todo item"
-                )}&userId=${userId}`,
-              },
-            ],
-          ],
-        },
-      });
-
-      // Respond to Telegram immediately
-      try {
-        const response = await fetch(
-          `https://api.telegram.org/bot${BOT_TOKEN}/answerInlineQuery`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              inline_query_id: queryId,
-              results: results,
-              cache_time: 0,
-              is_personal: true,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Telegram API error:", response.status, errorText);
-        }
-      } catch (error) {
-        console.error("Error responding to inline query:", error);
-      }
-
-      return NextResponse.json({ success: true });
-    }
-
-    // Handle regular messages
-    if (update.message) {
-      const message = update.message;
-      const chatId = message.chat.id;
-      const text = message.text;
-
-      // Log all regular messages for debugging
-      console.log("Regular message received:", {
-        messageId: message.message_id,
-        text,
-        chatId,
-        userId: message.from.id,
-      });
-
-      // Check if this is a message posted from inline query result (starts with "✅ Todo:" or "✅ New todo item")
-      if (
-        text &&
-        (text.startsWith("✅ Todo:") || text.startsWith("✅ New todo item"))
-      ) {
-        console.log(
-          "✅ Detected message from inline query result, updating edit button with messageId"
-        );
-        console.log("Message details:", {
-          text,
-          messageId: message.message_id,
-          chatId,
-          userId: message.from.id,
-        });
-
-        // Extract todo content
-        let todoContent = "New todo item";
-        if (text.startsWith("✅ Todo: ")) {
-          todoContent = text.replace("✅ Todo: ", "").trim();
-        } else if (text.startsWith("✅ New todo item created")) {
-          todoContent = "New todo item";
-        }
-        const messageId = message.message_id;
-        const userId = message.from.id;
-
-        console.log("Updating inline result message with proper edit URL:", {
-          chatId,
-          messageId,
-          todoContent,
-          userId,
-        });
-
-        // Update the message's edit button to include the messageId
-        try {
-          const updateResponse = await fetch(
-            `https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`,
-            {
+        if (text === "/start") {
+          try {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 chat_id: chatId,
-                message_id: messageId,
+                text: `👋 Welcome ${message.from.first_name}!\n\n📝 Use this bot in two ways:\n\n1️⃣ **Inline mode**: Type @CreateTodoListBot in any chat\n2️⃣ **Direct mode**: Use the button below`,
                 reply_markup: {
                   inline_keyboard: [
                     [
                       {
-                        text: "✏️ Edit Todo",
-                        url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(
-                          todoContent
-                        )}&userId=${userId}&messageId=${messageId}`,
+                        text: "ℹ️ How to use inline mode",
+                        url: "https://core.telegram.org/bots/inline",
                       },
                     ],
                   ],
                 },
               }),
-            }
-          );
-
-          if (!updateResponse.ok) {
-            const updateErrorText = await updateResponse.text();
-            console.error(
-              "Error updating inline result message buttons:",
-              updateResponse.status,
-              updateErrorText
-            );
-          } else {
-            console.log(
-              "Successfully updated inline result edit button with messageId:",
-              messageId
-            );
+            });
+          } catch (error) {
+            console.error("Error sending start message:", error);
           }
-        } catch (error) {
-          console.error("Error updating inline result message buttons:", error);
         }
 
         return NextResponse.json({ success: true });
       }
 
-      if (text === "/start") {
-        try {
-          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: `👋 Welcome ${message.from.first_name}!\n\n📝 Use this bot in two ways:\n\n1️⃣ **Inline mode**: Type @CreateTodoListBot in any chat\n2️⃣ **Direct mode**: Use the button below`,
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    {
-                      text: "ℹ️ How to use inline mode",
-                      url: "https://core.telegram.org/bots/inline",
-                    },
-                  ],
-                ],
-              },
-            }),
-          });
-        } catch (error) {
-          console.error("Error sending start message:", error);
-        }
-      }
-
       return NextResponse.json({ success: true });
+      
+    } catch (processingError) {
+      console.error("❌ Error processing update:", processingError);
+      return NextResponse.json({ success: true }); // Return success to avoid webhook errors
     }
-
-    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Webhook error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    console.error("❌ Webhook error:", error);
+    return NextResponse.json({ success: true }); // Return success to avoid webhook errors
   }
 }
 
