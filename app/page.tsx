@@ -28,7 +28,6 @@ declare global {
           chat?: object;
           auth_date?: number;
           query_id?: string;
-          start_param?: string;
         };
         version: string;
         platform: string;
@@ -48,44 +47,6 @@ export default function Home() {
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState('');
   const [isInlineMode, setIsInlineMode] = useState(false);
-
-  // Function to get pre-filled text from URL params or Telegram Web App data
-  const getPrefilledText = useCallback(() => {
-    try {
-      // First, try to get text from URL parameters
-      if (typeof window !== 'undefined') {
-        const urlParams = new URLSearchParams(window.location.search);
-        const textParam = urlParams.get('text');
-        if (textParam) {
-          return decodeURIComponent(textParam);
-        }
-      }
-
-      // Second, try to get text from Telegram Web App start parameter
-      if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
-        return decodeURIComponent(window.Telegram.WebApp.initDataUnsafe.start_param);
-      }
-
-      // Third, check if there's any message context in the init data
-      const initData = window.Telegram?.WebApp?.initData;
-      if (initData) {
-        // Parse the init data to see if there's any message context
-        try {
-          const params = new URLSearchParams(initData);
-          const startParam = params.get('start_param');
-          if (startParam) {
-            return decodeURIComponent(startParam);
-          }
-        } catch {
-          // Ignore parsing errors
-        }
-      }
-
-      return '';
-    } catch {
-      return '';
-    }
-  }, []);
 
   const sendMessage = useCallback(() => {
     if (message.trim() && window.Telegram?.WebApp) {
@@ -121,12 +82,6 @@ export default function Home() {
         // Call ready() immediately
         tg.ready();
         
-        // Get pre-filled text and set it if available
-        const prefilledText = getPrefilledText();
-        if (prefilledText && mounted) {
-          setMessage(prefilledText);
-        }
-        
         // Expand the app
         try {
           tg.expand();
@@ -153,8 +108,7 @@ export default function Home() {
         
         mainButton.onClick(sendMessage);
         
-        // Show main button if there's pre-filled text or current message
-        if (prefilledText || message.trim()) {
+        if (message.trim()) {
           mainButton.show();
         } else {
           mainButton.hide();
@@ -186,7 +140,7 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, [message, sendMessage, getPrefilledText]);
+  }, [message, sendMessage]);
 
   // Update main button visibility when message changes
   useEffect(() => {
@@ -221,12 +175,6 @@ export default function Home() {
             </p>
           )}
           
-          {message && isReady && (
-            <p className="text-green-600 dark:text-green-400 text-sm">
-              ✅ Message content loaded from Telegram
-            </p>
-          )}
-          
           {!isReady && (
             <p className="text-orange-500 text-sm">⏳ Loading...</p>
           )}
@@ -244,11 +192,9 @@ export default function Home() {
           <textarea
             className="flex-1 w-full resize-none border-2 border-gray-300 dark:border-gray-600 rounded-xl outline-none p-4 text-lg bg-white dark:bg-gray-800 text-black dark:text-white focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
             placeholder={
-              message ? 
-                "✍️ Edit your todo item..." :
-                isInlineMode 
-                  ? "✍️ What todo would you like to create and share?" 
-                  : "✍️ Enter your todo item...\n\n💡 Tip: Send a message to the bot first to pre-fill this field!"
+              isInlineMode 
+                ? "✍️ What todo would you like to create and share?" 
+                : "✍️ Enter your todo item..."
             }
             value={message}
             onChange={(e) => {
