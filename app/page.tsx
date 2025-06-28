@@ -47,6 +47,23 @@ export default function Home() {
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState('');
   const [isInlineMode, setIsInlineMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [originalContent, setOriginalContent] = useState('');
+
+  // Parse URL parameters on component mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const editMode = urlParams.get('edit') === 'true';
+      const content = urlParams.get('content');
+      
+      if (editMode && content) {
+        setIsEditMode(true);
+        setOriginalContent(decodeURIComponent(content));
+        setMessage(decodeURIComponent(content));
+      }
+    }
+  }, []);
 
   const sendMessage = useCallback(() => {
     if (message.trim() && window.Telegram?.WebApp) {
@@ -98,7 +115,11 @@ export default function Home() {
         
         // Setup main button
         const mainButton = tg.MainButton;
-        mainButton.text = hasQueryId ? 'Share in Chat' : 'Send Message';
+        mainButton.text = isEditMode 
+          ? 'Update Todo' 
+          : hasQueryId 
+            ? 'Share in Chat' 
+            : 'Send Message';
         
         try {
           mainButton.offClick(sendMessage);
@@ -108,7 +129,7 @@ export default function Home() {
         
         mainButton.onClick(sendMessage);
         
-        if (message.trim()) {
+        if (message.trim() && (!isEditMode || message !== originalContent)) {
           mainButton.show();
         } else {
           mainButton.hide();
@@ -140,19 +161,19 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, [message, sendMessage]);
+  }, [message, sendMessage, isEditMode, originalContent]);
 
   // Update main button visibility when message changes
   useEffect(() => {
     if (isReady && window.Telegram?.WebApp?.MainButton) {
       const mainButton = window.Telegram.WebApp.MainButton;
-      if (message.trim()) {
+      if (message.trim() && (!isEditMode || message !== originalContent)) {
         mainButton.show();
       } else {
         mainButton.hide();
       }
     }
-  }, [message, isReady]);
+  }, [message, isReady, isEditMode, originalContent]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -166,10 +187,21 @@ export default function Home() {
         {/* Header */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-black dark:text-white mb-2">
-            {isInlineMode ? '✍️ Create & Share Todo' : '📝 Todo Editor'}
+            {isEditMode 
+              ? '✏️ Edit Todo' 
+              : isInlineMode 
+                ? '✍️ Create & Share Todo' 
+                : '📝 Todo Editor'
+            }
           </h1>
           
-          {isInlineMode && isReady && (
+          {isEditMode && isReady && (
+            <p className="text-blue-600 dark:text-blue-400 text-sm">
+              Edit your todo item
+            </p>
+          )}
+          
+          {isInlineMode && isReady && !isEditMode && (
             <p className="text-blue-600 dark:text-blue-400 text-sm">
               Create your todo item and share it in the chat
             </p>
@@ -192,9 +224,11 @@ export default function Home() {
           <textarea
             className="flex-1 w-full resize-none border-2 border-gray-300 dark:border-gray-600 rounded-xl outline-none p-4 text-lg bg-white dark:bg-gray-800 text-black dark:text-white focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
             placeholder={
-              isInlineMode 
-                ? "✍️ What todo would you like to create and share?" 
-                : "✍️ Enter your todo item..."
+              isEditMode
+                ? "✏️ Edit your todo item..."
+                : isInlineMode 
+                  ? "✍️ What todo would you like to create and share?" 
+                  : "✍️ Enter your todo item..."
             }
             value={message}
             onChange={(e) => {
@@ -210,14 +244,27 @@ export default function Home() {
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500">
               {message.length} characters
+              {isEditMode && (
+                <div className="text-xs mt-1">
+                  {message === originalContent 
+                    ? "📝 No changes made" 
+                    : "✏️ Modified"
+                  }
+                </div>
+              )}
             </div>
             
             <button
               onClick={sendMessage}
-              disabled={!message.trim() || !isReady}
+              disabled={!message.trim() || !isReady || (isEditMode && message === originalContent)}
               className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:text-gray-500 hover:bg-blue-600 transition-colors text-lg"
             >
-              {isInlineMode ? '🔄 Share' : '📤 Send'}
+              {isEditMode 
+                ? '💾 Update' 
+                : isInlineMode 
+                  ? '🔄 Share' 
+                  : '📤 Send'
+              }
             </button>
           </div>
         </div>
