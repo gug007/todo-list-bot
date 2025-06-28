@@ -50,6 +50,7 @@ export default function Home() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [originalContent, setOriginalContent] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
+  const [messageId, setMessageId] = useState<string | null>(null);
 
   // Parse URL parameters on component mount
   useEffect(() => {
@@ -58,8 +59,9 @@ export default function Home() {
       const editMode = urlParams.get('edit') === 'true';
       const content = urlParams.get('content');
       const userIdParam = urlParams.get('userId');
+      const messageIdParam = urlParams.get('messageId');
       
-      console.log('URL parsing:', { editMode, content, userId: userIdParam, url: window.location.search });
+      console.log('URL parsing:', { editMode, content, userId: userIdParam, messageId: messageIdParam, url: window.location.search });
       
       if (editMode && content) {
         console.log('Setting edit mode with content:', decodeURIComponent(content));
@@ -72,53 +74,57 @@ export default function Home() {
         setUserId(userIdParam);
         console.log('Found userId in URL:', userIdParam);
       }
+      
+      if (messageIdParam && messageIdParam !== 'PLACEHOLDER') {
+        setMessageId(messageIdParam);
+        console.log('Found messageId in URL:', messageIdParam);
+      }
     }
   }, []);
 
   const sendMessage = useCallback(async () => {
-    console.log('sendMessage called', { message: message.trim(), isEditMode, isInlineMode });
+    console.log('sendMessage called', { message: message.trim(), isEditMode, isInlineMode, messageId });
     
     if (message.trim()) {
       try {
-        if (isEditMode) {
-          console.log('Edit mode: attempting multiple update methods');
+        if (isEditMode && messageId) {
+          // Edit mode with message ID - send JSON data for webhook to edit existing message
+          console.log('Edit mode with messageId: sending structured data for message editing');
           
-          // Method 1: Try the standard Telegram WebApp sendData if available
           if (window.Telegram?.WebApp) {
             const tg = window.Telegram.WebApp;
-            console.log('Method 1: Sending data via Telegram WebApp');
+            const dataToSend = JSON.stringify({
+              content: message.trim(),
+              messageId: messageId
+            });
+            console.log('Sending data for message editing:', dataToSend);
+            tg.sendData(dataToSend);
+          }
+          
+          // Show success feedback
+          setError('✅ Todo updated successfully!');
+          setTimeout(() => setError(''), 2000);
+          
+          // Close the mini app after sending
+          setTimeout(() => {
+            console.log('Closing mini app');
+            if (window.Telegram?.WebApp) {
+              window.Telegram.WebApp.close();
+            }
+          }, 500);
+          
+        } else if (isEditMode && !messageId) {
+          // Edit mode without message ID - send simple data (will create new message)
+          console.log('Edit mode without messageId: sending simple data for new message');
+          
+          if (window.Telegram?.WebApp) {
+            const tg = window.Telegram.WebApp;
             tg.sendData(message.trim());
           }
           
-          // Method 2: Try direct API call as fallback
-          try {
-            console.log('Method 2: Sending direct API call');
-                         const response = await fetch('/api/update-todo', {
-               method: 'POST',
-               headers: {
-                 'Content-Type': 'application/json',
-               },
-               body: JSON.stringify({
-                 content: message.trim(),
-                 originalContent: originalContent,
-                 userId: userId,
-                 initData: window.Telegram?.WebApp?.initData || '',
-               }),
-             });
-            
-            const result = await response.json();
-            console.log('Direct API response:', result);
-            
-            if (result.success) {
-              // Success feedback
-              setError('✅ Todo updated successfully!');
-              setTimeout(() => setError(''), 2000);
-            }
-          } catch (apiError) {
-            console.error('Direct API call failed:', apiError);
-          }
+          setError('✅ Todo updated successfully!');
+          setTimeout(() => setError(''), 2000);
           
-          // Close the mini app after sending
           setTimeout(() => {
             console.log('Closing mini app');
             if (window.Telegram?.WebApp) {
@@ -152,7 +158,7 @@ export default function Home() {
         hasTelegram: !!window.Telegram?.WebApp 
       });
     }
-  }, [message, isInlineMode, isEditMode, originalContent, userId]);
+  }, [message, isInlineMode, isEditMode, originalContent, userId, messageId]);
 
   useEffect(() => {
     let mounted = true;
