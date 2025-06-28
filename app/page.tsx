@@ -45,34 +45,8 @@ declare global {
 export default function Home() {
   const [message, setMessage] = useState('');
   const [isReady, setIsReady] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [isInlineMode, setIsInlineMode] = useState(false);
-
-  const addDebugInfo = (info: string) => {
-    setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${info}`]);
-  };
-
-  // Force immediate ready call when Telegram is detected
-  useEffect(() => {
-    const forceReady = () => {
-      if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-        try {
-          window.Telegram.WebApp.ready();
-          addDebugInfo('EMERGENCY: Immediate ready() called');
-        } catch (e) {
-          addDebugInfo(`EMERGENCY: Ready failed: ${e}`);
-        }
-      }
-    };
-
-    // Call immediately
-    forceReady();
-    
-    // Also call after a tiny delay
-    const timer = setTimeout(forceReady, 10);
-    return () => clearTimeout(timer);
-  }, []);
 
   const sendMessage = useCallback(() => {
     if (message.trim() && window.Telegram?.WebApp) {
@@ -82,18 +56,14 @@ export default function Home() {
         if (isInlineMode) {
           // For inline mode, use switchInlineQuery
           tg.switchInlineQuery(message.trim(), ['users', 'groups', 'channels']);
-          addDebugInfo('Inline query sent successfully');
         } else {
           // For regular mini apps, use sendData
           tg.sendData(message.trim());
-          addDebugInfo('Message sent successfully');
         }
         
         setMessage(''); // Clear message after sending
       } catch (err) {
-        const errorMsg = `Failed to send: ${err}`;
-        setError(errorMsg);
-        addDebugInfo(errorMsg);
+        setError(`Failed to send: ${err}`);
       }
     }
   }, [message, isInlineMode]);
@@ -101,66 +71,30 @@ export default function Home() {
   useEffect(() => {
     let mounted = true;
     
-    addDebugInfo('=== INITIALIZATION START ===');
-    addDebugInfo(`User Agent: ${navigator.userAgent}`);
-    addDebugInfo(`Current URL: ${window.location.href}`);
-    addDebugInfo(`Protocol: ${window.location.protocol}`);
-    addDebugInfo(`Host: ${window.location.host}`);
-    
     const initTelegram = () => {
       try {
-        addDebugInfo('Checking for Telegram...');
-        
-        if (typeof window === 'undefined') {
-          addDebugInfo('❌ Window undefined');
-          return;
-        }
-        
-        if (!window.Telegram) {
-          addDebugInfo('❌ window.Telegram not found');
-          return;
-        }
-        
-        if (!window.Telegram.WebApp) {
-          addDebugInfo('❌ window.Telegram.WebApp not found');
+        if (typeof window === 'undefined' || !window.Telegram?.WebApp) {
           return;
         }
         
         const tg = window.Telegram.WebApp;
-        addDebugInfo('✅ Telegram WebApp found!');
         
-        // CRITICAL: Call ready() immediately
+        // Call ready() immediately
         tg.ready();
-        addDebugInfo('✅ ready() called immediately');
         
         // Expand the app
         try {
           tg.expand();
-          addDebugInfo('✅ expand() called');
         } catch {
-          addDebugInfo('⚠️ expand() not available');
+          // Ignore if not available
         }
         
         if (!mounted) return;
         
-        // Get basic info
-        addDebugInfo(`Version: ${tg.version || 'unknown'}`);
-        addDebugInfo(`Platform: ${tg.platform || 'unknown'}`);
-        addDebugInfo(`Color scheme: ${tg.colorScheme || 'unknown'}`);
-        addDebugInfo(`Viewport: ${tg.viewportHeight || 'unknown'}px`);
-        
         // Check mode
         const hasQueryId = !!tg.initDataUnsafe?.query_id;
         setIsInlineMode(hasQueryId);
-        addDebugInfo(`Mode: ${hasQueryId ? '🔄 INLINE' : '📱 REGULAR'}`);
-        
         setIsReady(true);
-        addDebugInfo('✅ APP READY!');
-        
-        // User info
-        const userName = tg.initDataUnsafe?.user?.first_name || 'Unknown';
-        const userId = tg.initDataUnsafe?.user?.id || 'unknown';
-        addDebugInfo(`User: ${userName} (${userId})`);
         
         // Setup main button
         const mainButton = tg.MainButton;
@@ -180,13 +114,9 @@ export default function Home() {
           mainButton.hide();
         }
         
-        addDebugInfo('✅ Main button configured');
-        
       } catch (err) {
         if (mounted) {
-          const errorMsg = `❌ Init error: ${err}`;
-          setError(errorMsg);
-          addDebugInfo(errorMsg);
+          setError(`Initialization error: ${err}`);
         }
       }
     };
@@ -212,128 +142,92 @@ export default function Home() {
     };
   }, [message, sendMessage]);
 
+  // Update main button visibility when message changes
+  useEffect(() => {
+    if (isReady && window.Telegram?.WebApp?.MainButton) {
+      const mainButton = window.Telegram.WebApp.MainButton;
+      if (message.trim()) {
+        mainButton.show();
+      } else {
+        mainButton.hide();
+      }
+    }
+  }, [message, isReady]);
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       sendMessage();
     }
   };
 
-  const testSend = () => {
-    if (!isReady) {
-      setError('Telegram not ready yet');
-      addDebugInfo('❌ Send attempted but not ready');
-      return;
-    }
-    sendMessage();
-  };
-
-  const clearDebug = () => {
-    setDebugInfo([]);
-    setError('');
-  };
-
-  const forceInit = () => {
-    if (window.Telegram?.WebApp) {
-      try {
-        window.Telegram.WebApp.ready();
-        addDebugInfo('🔧 MANUAL ready() called');
-        setIsReady(true);
-      } catch (e) {
-        addDebugInfo(`🔧 MANUAL ready() failed: ${e}`);
-      }
-    }
-  };
-
   return (
-    <div className="w-screen h-screen p-4 bg-white dark:bg-gray-900 overflow-auto">
-      <div className="h-full flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-lg font-bold text-black dark:text-white">
-            {isInlineMode ? '🔄 Share Todo' : '📱 Todo Bot'}
+    <div className="w-screen h-screen p-4 bg-white dark:bg-gray-900">
+      <div className="h-full flex flex-col gap-4 max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-black dark:text-white mb-2">
+            {isInlineMode ? '✍️ Create & Share Todo' : '📝 Todo Editor'}
           </h1>
-          <div className="flex gap-2">
-            {!isReady && (
-              <button
-                onClick={forceInit}
-                className="text-xs px-2 py-1 bg-green-200 dark:bg-green-700 rounded text-green-600 dark:text-green-300"
-              >
-                Force Init
-              </button>
-            )}
-            <button
-              onClick={clearDebug}
-              className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <span className={`text-lg ${isReady ? 'text-green-500' : 'text-orange-500'}`}>
-            {isReady ? '✅ Ready' : '⏳ Loading...'}
-          </span>
-          {isReady && (
-            <span className="text-sm text-gray-500">
-              {isInlineMode ? '🔄 Inline' : '📱 Regular'}
-            </span>
+          
+          {isInlineMode && isReady && (
+            <p className="text-blue-600 dark:text-blue-400 text-sm">
+              Create your todo item and share it in the chat
+            </p>
+          )}
+          
+          {!isReady && (
+            <p className="text-orange-500 text-sm">⏳ Loading...</p>
           )}
         </div>
 
-        {isInlineMode && isReady && (
-          <div className="p-3 bg-blue-100 dark:bg-blue-900 border border-blue-400 rounded-lg">
-            <p className="text-blue-700 dark:text-blue-300 text-sm">
-              🔄 <strong>Inline Mode Active:</strong> Create your todo and share it!
-            </p>
-          </div>
-        )}
-        
+        {/* Error message */}
         {error && (
           <div className="p-3 bg-red-100 dark:bg-red-900 border border-red-400 rounded-lg">
-            <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+            <p className="text-red-700 dark:text-red-300 text-sm">❌ {error}</p>
           </div>
         )}
         
-        <textarea
-          className="flex-1 w-full resize-none border border-gray-300 dark:border-gray-600 rounded-lg outline-none p-4 text-base bg-white dark:bg-gray-800 text-black dark:text-white focus:border-blue-500 dark:focus:border-blue-400 min-h-32"
-          placeholder={
-            isInlineMode 
-              ? "✍️ Type your todo item to share..." 
-              : "✍️ Type your todo item..."
-          }
-          value={message}
-          onChange={(e) => {
-            setMessage(e.target.value);
-            setError('');
-          }}
-          onKeyDown={handleKeyPress}
-          autoFocus
-        />
-        
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-500">
-            {message.length} characters
-          </div>
+        {/* Main editing area */}
+        <div className="flex-1 flex flex-col gap-3">
+          <textarea
+            className="flex-1 w-full resize-none border-2 border-gray-300 dark:border-gray-600 rounded-xl outline-none p-4 text-lg bg-white dark:bg-gray-800 text-black dark:text-white focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+            placeholder={
+              isInlineMode 
+                ? "✍️ What todo would you like to create and share?" 
+                : "✍️ Enter your todo item..."
+            }
+            value={message}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              setError('');
+            }}
+            onKeyDown={handleKeyPress}
+            autoFocus
+            style={{ minHeight: '200px' }}
+          />
           
-          <button
-            onClick={testSend}
-            disabled={!message.trim() || !isReady}
-            className="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:text-gray-500 hover:bg-blue-600 transition-colors"
-          >
-            {isInlineMode ? '🔄 Share' : '📤 Send'}
-          </button>
+          {/* Character count and send button */}
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-500">
+              {message.length} characters
+            </div>
+            
+            <button
+              onClick={sendMessage}
+              disabled={!message.trim() || !isReady}
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:text-gray-500 hover:bg-blue-600 transition-colors text-lg"
+            >
+              {isInlineMode ? '🔄 Share' : '📤 Send'}
+            </button>
+          </div>
         </div>
         
-        <div className="text-xs text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg max-h-40 overflow-y-auto">
-          <p className="font-semibold mb-2">🔍 Debug Log:</p>
-          {debugInfo.length === 0 ? (
-            <div>Waiting for initialization...</div>
+        {/* Tips */}
+        <div className="text-center text-xs text-gray-500 dark:text-gray-400 mt-2">
+          {isReady ? (
+            <p>💡 Press Cmd/Ctrl + Enter to send quickly</p>
           ) : (
-            debugInfo.map((info, index) => (
-              <div key={index} className="mb-1 font-mono text-xs">
-                {info}
-              </div>
-            ))
+            <p>🔄 Connecting to Telegram...</p>
           )}
         </div>
       </div>
