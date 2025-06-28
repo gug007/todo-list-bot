@@ -36,6 +36,7 @@ declare global {
         isExpanded: boolean;
         viewportHeight: number;
         viewportStableHeight: number;
+        expand: () => void;
       };
     };
   }
@@ -51,6 +52,27 @@ export default function Home() {
   const addDebugInfo = (info: string) => {
     setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${info}`]);
   };
+
+  // Force immediate ready call when Telegram is detected
+  useEffect(() => {
+    const forceReady = () => {
+      if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+        try {
+          window.Telegram.WebApp.ready();
+          addDebugInfo('EMERGENCY: Immediate ready() called');
+        } catch (e) {
+          addDebugInfo(`EMERGENCY: Ready failed: ${e}`);
+        }
+      }
+    };
+
+    // Call immediately
+    forceReady();
+    
+    // Also call after a tiny delay
+    const timer = setTimeout(forceReady, 10);
+    return () => clearTimeout(timer);
+  }, []);
 
   const sendMessage = useCallback(() => {
     if (message.trim() && window.Telegram?.WebApp) {
@@ -78,132 +100,111 @@ export default function Home() {
 
   useEffect(() => {
     let mounted = true;
-    let checkCount = 0;
-    const maxChecks = 20; // Check for 2 seconds
     
-    addDebugInfo('Starting Telegram initialization...');
+    addDebugInfo('=== INITIALIZATION START ===');
     addDebugInfo(`User Agent: ${navigator.userAgent}`);
     addDebugInfo(`Current URL: ${window.location.href}`);
     addDebugInfo(`Protocol: ${window.location.protocol}`);
-    
-    const checkTelegram = () => {
-      checkCount++;
-      addDebugInfo(`Check #${checkCount}: Looking for Telegram...`);
-      
-      if (typeof window === 'undefined') {
-        addDebugInfo('Window is undefined');
-        return false;
-      }
-      
-      if (!window.Telegram) {
-        addDebugInfo('window.Telegram is not available');
-        return false;
-      }
-      
-      if (!window.Telegram.WebApp) {
-        addDebugInfo('window.Telegram.WebApp is not available');
-        return false;
-      }
-      
-      addDebugInfo('Telegram WebApp found! Initializing...');
-      return true;
-    };
+    addDebugInfo(`Host: ${window.location.host}`);
     
     const initTelegram = () => {
       try {
-        if (checkTelegram() && window.Telegram?.WebApp) {
-          const tg = window.Telegram.WebApp;
-          
-          addDebugInfo(`Telegram version: ${tg.version || 'unknown'}`);
-          addDebugInfo(`Platform: ${tg.platform || 'unknown'}`);
-          addDebugInfo(`Color scheme: ${tg.colorScheme || 'unknown'}`);
-          addDebugInfo(`Viewport height: ${tg.viewportHeight || 'unknown'}`);
-          
-          // Check if this is inline mode
-          const hasQueryId = !!tg.initDataUnsafe?.query_id;
-          setIsInlineMode(hasQueryId);
-          addDebugInfo(`Mode: ${hasQueryId ? 'Inline Mode' : 'Regular Mini App'}`);
-          
-          // Initialize Telegram Web App
-          tg.ready();
-          addDebugInfo('Telegram ready() called');
-          
-          if (mounted) {
-            setIsReady(true);
-            const userName = tg.initDataUnsafe?.user?.first_name || 'Unknown';
-            const userId = tg.initDataUnsafe?.user?.id || 'unknown';
-            addDebugInfo(`User: ${userName} (ID: ${userId})`);
-            addDebugInfo(`Init data: ${tg.initData ? 'present' : 'missing'}`);
-            
-            // Configure main button
-            const mainButton = tg.MainButton;
-            mainButton.text = hasQueryId ? 'Share in Chat' : 'Send Message';
-            
-            // Remove any existing click handlers
-            try {
-              mainButton.offClick(sendMessage);
-            } catch {
-              addDebugInfo('Note: offClick not available in this Telegram version');
-            }
-            
-            mainButton.onClick(sendMessage);
-            addDebugInfo('Main button configured');
-            
-            // Show/hide button based on message content
-            if (message.trim()) {
-              mainButton.show();
-              addDebugInfo('Main button shown');
-            } else {
-              mainButton.hide();
-              addDebugInfo('Main button hidden');
-            }
-          }
-        } else {
-          if (mounted && checkCount >= maxChecks) {
-            const errorMsg = 'Telegram Web App not available after 20 attempts. This app must be opened through a Telegram bot.';
-            setError(errorMsg);
-            addDebugInfo(errorMsg);
-            
-            // Check if we're in development
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-              addDebugInfo('DEVELOPMENT MODE DETECTED: Mini apps only work when deployed with HTTPS');
-            }
-          }
+        addDebugInfo('Checking for Telegram...');
+        
+        if (typeof window === 'undefined') {
+          addDebugInfo('❌ Window undefined');
+          return;
         }
+        
+        if (!window.Telegram) {
+          addDebugInfo('❌ window.Telegram not found');
+          return;
+        }
+        
+        if (!window.Telegram.WebApp) {
+          addDebugInfo('❌ window.Telegram.WebApp not found');
+          return;
+        }
+        
+        const tg = window.Telegram.WebApp;
+        addDebugInfo('✅ Telegram WebApp found!');
+        
+        // CRITICAL: Call ready() immediately
+        tg.ready();
+        addDebugInfo('✅ ready() called immediately');
+        
+        // Expand the app
+        try {
+          tg.expand();
+          addDebugInfo('✅ expand() called');
+        } catch {
+          addDebugInfo('⚠️ expand() not available');
+        }
+        
+        if (!mounted) return;
+        
+        // Get basic info
+        addDebugInfo(`Version: ${tg.version || 'unknown'}`);
+        addDebugInfo(`Platform: ${tg.platform || 'unknown'}`);
+        addDebugInfo(`Color scheme: ${tg.colorScheme || 'unknown'}`);
+        addDebugInfo(`Viewport: ${tg.viewportHeight || 'unknown'}px`);
+        
+        // Check mode
+        const hasQueryId = !!tg.initDataUnsafe?.query_id;
+        setIsInlineMode(hasQueryId);
+        addDebugInfo(`Mode: ${hasQueryId ? '🔄 INLINE' : '📱 REGULAR'}`);
+        
+        setIsReady(true);
+        addDebugInfo('✅ APP READY!');
+        
+        // User info
+        const userName = tg.initDataUnsafe?.user?.first_name || 'Unknown';
+        const userId = tg.initDataUnsafe?.user?.id || 'unknown';
+        addDebugInfo(`User: ${userName} (${userId})`);
+        
+        // Setup main button
+        const mainButton = tg.MainButton;
+        mainButton.text = hasQueryId ? 'Share in Chat' : 'Send Message';
+        
+        try {
+          mainButton.offClick(sendMessage);
+        } catch {
+          // Ignore if not available
+        }
+        
+        mainButton.onClick(sendMessage);
+        
+        if (message.trim()) {
+          mainButton.show();
+        } else {
+          mainButton.hide();
+        }
+        
+        addDebugInfo('✅ Main button configured');
+        
       } catch (err) {
         if (mounted) {
-          const errorMsg = `Initialization error: ${err}`;
+          const errorMsg = `❌ Init error: ${err}`;
           setError(errorMsg);
           addDebugInfo(errorMsg);
         }
       }
     };
 
-    // Immediate check
+    // Multiple initialization attempts
     if (typeof window !== 'undefined') {
-      addDebugInfo('Window is available, checking immediately...');
-      if (checkTelegram()) {
-        initTelegram();
-      } else {
-        // Retry every 100ms
-        const timer = setInterval(() => {
-          if (checkCount >= maxChecks) {
-            clearInterval(timer);
-            initTelegram(); // Final attempt with error handling
-            return;
-          }
-          
-          if (checkTelegram()) {
-            clearInterval(timer);
-            initTelegram();
-          }
-        }, 100);
-        
-        return () => {
-          clearInterval(timer);
-          mounted = false;
-        };
-      }
+      // Immediate attempt
+      initTelegram();
+      
+      // Fallback attempts
+      const timers = [50, 100, 200, 500].map(delay => 
+        setTimeout(initTelegram, delay)
+      );
+      
+      return () => {
+        mounted = false;
+        timers.forEach(clearTimeout);
+      };
     }
 
     return () => {
@@ -220,7 +221,7 @@ export default function Home() {
   const testSend = () => {
     if (!isReady) {
       setError('Telegram not ready yet');
-      addDebugInfo('Send attempted but Telegram not ready');
+      addDebugInfo('❌ Send attempted but not ready');
       return;
     }
     sendMessage();
@@ -231,25 +232,58 @@ export default function Home() {
     setError('');
   };
 
+  const forceInit = () => {
+    if (window.Telegram?.WebApp) {
+      try {
+        window.Telegram.WebApp.ready();
+        addDebugInfo('🔧 MANUAL ready() called');
+        setIsReady(true);
+      } catch (e) {
+        addDebugInfo(`🔧 MANUAL ready() failed: ${e}`);
+      }
+    }
+  };
+
   return (
     <div className="w-screen h-screen p-4 bg-white dark:bg-gray-900 overflow-auto">
       <div className="h-full flex flex-col gap-4">
         <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold text-black dark:text-white">
-            {isInlineMode ? 'Share Todo Item' : 'Todo List Bot'}
+          <h1 className="text-lg font-bold text-black dark:text-white">
+            {isInlineMode ? '🔄 Share Todo' : '📱 Todo Bot'}
           </h1>
-          <button
-            onClick={clearDebug}
-            className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300"
-          >
-            Clear Debug
-          </button>
+          <div className="flex gap-2">
+            {!isReady && (
+              <button
+                onClick={forceInit}
+                className="text-xs px-2 py-1 bg-green-200 dark:bg-green-700 rounded text-green-600 dark:text-green-300"
+              >
+                Force Init
+              </button>
+            )}
+            <button
+              onClick={clearDebug}
+              className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300"
+            >
+              Clear
+            </button>
+          </div>
         </div>
 
-        {isInlineMode && (
+        <div className="flex justify-between items-center">
+          <span className={`text-lg ${isReady ? 'text-green-500' : 'text-orange-500'}`}>
+            {isReady ? '✅ Ready' : '⏳ Loading...'}
+          </span>
+          {isReady && (
+            <span className="text-sm text-gray-500">
+              {isInlineMode ? '🔄 Inline' : '📱 Regular'}
+            </span>
+          )}
+        </div>
+
+        {isInlineMode && isReady && (
           <div className="p-3 bg-blue-100 dark:bg-blue-900 border border-blue-400 rounded-lg">
             <p className="text-blue-700 dark:text-blue-300 text-sm">
-              🔄 <strong>Inline Mode:</strong> Create your todo item and share it in any chat!
+              🔄 <strong>Inline Mode Active:</strong> Create your todo and share it!
             </p>
           </div>
         )}
@@ -261,65 +295,47 @@ export default function Home() {
         )}
         
         <textarea
-          className="flex-1 w-full resize-none border border-gray-300 dark:border-gray-600 rounded-lg outline-none p-4 text-base font-mono bg-white dark:bg-gray-800 text-black dark:text-white focus:border-blue-500 dark:focus:border-blue-400 min-h-24"
+          className="flex-1 w-full resize-none border border-gray-300 dark:border-gray-600 rounded-lg outline-none p-4 text-base bg-white dark:bg-gray-800 text-black dark:text-white focus:border-blue-500 dark:focus:border-blue-400 min-h-32"
           placeholder={
             isInlineMode 
-              ? "Type your todo item to share... (Ctrl/Cmd + Enter to share)" 
-              : "Type your todo item or message here... (Ctrl/Cmd + Enter to send)"
+              ? "✍️ Type your todo item to share..." 
+              : "✍️ Type your todo item..."
           }
           value={message}
           onChange={(e) => {
             setMessage(e.target.value);
-            setError(''); // Clear error when typing
+            setError('');
           }}
           onKeyDown={handleKeyPress}
           autoFocus
         />
         
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {isReady ? '✅ Telegram Ready' : '⏳ Loading...'}
-            </span>
-            {isReady && (
-              <span className="text-xs text-gray-400 dark:text-gray-500">
-                Mode: {isInlineMode ? 'Inline' : 'Regular'}
-              </span>
-            )}
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-gray-500">
+            {message.length} characters
           </div>
           
           <button
             onClick={testSend}
-            disabled={!message.trim()}
+            disabled={!message.trim() || !isReady}
             className="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:text-gray-500 hover:bg-blue-600 transition-colors"
           >
-            {isInlineMode ? 'Share in Chat' : 'Send'}
+            {isInlineMode ? '🔄 Share' : '📤 Send'}
           </button>
         </div>
         
-        {!isReady && (
-          <div className="text-sm text-gray-600 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <p><strong>Troubleshooting:</strong></p>
-            <ul className="list-disc list-inside mt-1 space-y-1">
-              <li>For Inline Mode: Type <code>@createtodolistbot</code> in any chat</li>
-              <li>Make sure you&apos;re opening this through a Telegram bot</li>
-              <li>The app must be deployed with HTTPS (not localhost)</li>
-              <li>Check if your bot is properly configured with the mini app URL</li>
-              <li>Try refreshing the mini app</li>
-            </ul>
-          </div>
-        )}
-        
-        {debugInfo.length > 0 && (
-          <div className="text-xs text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg max-h-40 overflow-y-auto">
-            <p className="font-semibold mb-2">Debug Log:</p>
-            {debugInfo.map((info, index) => (
-              <div key={index} className="mb-1 font-mono">
+        <div className="text-xs text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg max-h-40 overflow-y-auto">
+          <p className="font-semibold mb-2">🔍 Debug Log:</p>
+          {debugInfo.length === 0 ? (
+            <div>Waiting for initialization...</div>
+          ) : (
+            debugInfo.map((info, index) => (
+              <div key={index} className="mb-1 font-mono text-xs">
                 {info}
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
