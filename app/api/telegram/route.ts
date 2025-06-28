@@ -12,6 +12,7 @@ interface TelegramUpdate {
     offset: string;
   };
   message?: {
+    message_id: number;
     text: string;
     from: {
       id: number;
@@ -291,6 +292,67 @@ export async function POST(request: NextRequest) {
       const message = update.message;
       const chatId = message.chat.id;
       const text = message.text;
+
+      // Check if this is a message posted from inline query result (starts with "✅ Todo:" or "✅ New todo item")
+      if (text && (text.startsWith("✅ Todo:") || text.startsWith("✅ New todo item"))) {
+        console.log('Detected message from inline query result, updating edit button with messageId');
+        
+        // Extract todo content
+        let todoContent = "New todo item";
+        if (text.startsWith("✅ Todo: ")) {
+          todoContent = text.replace("✅ Todo: ", "").trim();
+        } else if (text.startsWith("✅ New todo item created")) {
+          todoContent = "New todo item";
+        }
+        const messageId = message.message_id;
+        const userId = message.from.id;
+        
+        console.log('Updating inline result message with proper edit URL:', {
+          chatId,
+          messageId,
+          todoContent,
+          userId
+        });
+        
+        // Update the message's edit button to include the messageId
+        try {
+          const updateResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              message_id: messageId,
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "📝 Open Todo App",
+                      url: MINI_APP_URL,
+                    },
+                  ],
+                  [
+                    {
+                      text: "✏️ Edit Todo",
+                      url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(todoContent)}&userId=${userId}&messageId=${messageId}`,
+                    },
+                  ],
+                ],
+              },
+            }),
+          });
+          
+          if (!updateResponse.ok) {
+            const updateErrorText = await updateResponse.text();
+            console.error("Error updating inline result message buttons:", updateResponse.status, updateErrorText);
+          } else {
+            console.log('Successfully updated inline result edit button with messageId:', messageId);
+          }
+        } catch (error) {
+          console.error('Error updating inline result message buttons:', error);
+        }
+        
+        return NextResponse.json({ success: true });
+      }
 
       if (text === "/start") {
         try {
