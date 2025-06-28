@@ -83,24 +83,22 @@ export async function POST(request: NextRequest) {
             ? `✅ Todo: ${query}`
             : "✅ New todo item created",
         },
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "📝 Open Todo App",
-                web_app: { url: MINI_APP_URL },
-              },
-            ],
-            [
-              {
-                text: "✏️ Edit Todo",
-                web_app: { 
-                  url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(query || "New todo item")}` 
+                  reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "📝 Open Todo App",
+                  url: MINI_APP_URL,
                 },
-              },
+              ],
+              [
+                {
+                  text: "✏️ Edit Todo",
+                  url: `${MINI_APP_URL}?edit=true&content=${encodeURIComponent(query || "New todo item")}`,
+                },
+              ],
             ],
-          ],
-        },
+          },
       });
 
       // Respond to Telegram immediately
