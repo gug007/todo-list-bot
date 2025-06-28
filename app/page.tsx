@@ -57,7 +57,10 @@ export default function Home() {
       const editMode = urlParams.get('edit') === 'true';
       const content = urlParams.get('content');
       
+      console.log('URL parsing:', { editMode, content, url: window.location.search });
+      
       if (editMode && content) {
+        console.log('Setting edit mode with content:', decodeURIComponent(content));
         setIsEditMode(true);
         setOriginalContent(decodeURIComponent(content));
         setMessage(decodeURIComponent(content));
@@ -66,21 +69,27 @@ export default function Home() {
   }, []);
 
   const sendMessage = useCallback(() => {
+    console.log('sendMessage called', { message: message.trim(), isEditMode, isInlineMode });
+    
     if (message.trim() && window.Telegram?.WebApp) {
       try {
         const tg = window.Telegram.WebApp;
         
         if (isEditMode) {
+          console.log('Edit mode: sending data', message.trim());
           // For edit mode, send data back to update the original message
           tg.sendData(message.trim());
           // Close the mini app after sending
           setTimeout(() => {
+            console.log('Closing mini app');
             tg.close();
           }, 100);
         } else if (isInlineMode) {
+          console.log('Inline mode: switching query');
           // For inline mode, use switchInlineQuery
           tg.switchInlineQuery(message.trim(), ['users', 'groups', 'channels']);
         } else {
+          console.log('Regular mode: sending data');
           // For regular mini apps, use sendData
           tg.sendData(message.trim());
         }
@@ -89,8 +98,14 @@ export default function Home() {
           setMessage(''); // Clear message after sending (except in edit mode)
         }
       } catch (err) {
+        console.error('Error in sendMessage:', err);
         setError(`Failed to send: ${err}`);
       }
+    } else {
+      console.log('sendMessage: conditions not met', { 
+        hasMessage: !!message.trim(), 
+        hasTelegram: !!window.Telegram?.WebApp 
+      });
     }
   }, [message, isInlineMode, isEditMode]);
 
@@ -122,27 +137,8 @@ export default function Home() {
         setIsInlineMode(hasQueryId);
         setIsReady(true);
         
-        // Setup main button
-        const mainButton = tg.MainButton;
-        mainButton.text = isEditMode 
-          ? '💾 Update Todo' 
-          : hasQueryId 
-            ? '🔄 Share in Chat' 
-            : '📤 Send Message';
-        
-        try {
-          mainButton.offClick(sendMessage);
-        } catch {
-          // Ignore if not available
-        }
-        
-        mainButton.onClick(sendMessage);
-        
-        if (message.trim() && (!isEditMode || message !== originalContent)) {
-          mainButton.show();
-        } else {
-          mainButton.hide();
-        }
+        // Basic setup, main button will be configured in separate effect
+        // Just mark as ready here
         
       } catch (err) {
         if (mounted) {
@@ -170,19 +166,52 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, [message, sendMessage, isEditMode, originalContent]);
+  }, [sendMessage]); // Simplified dependencies since main button setup moved
 
-  // Update main button visibility when message changes
+  // Setup and update main button when ready and modes are detected
   useEffect(() => {
+    console.log('Main button effect:', { isReady, isEditMode, messageLength: message.length, originalContent });
+    
     if (isReady && window.Telegram?.WebApp?.MainButton) {
-      const mainButton = window.Telegram.WebApp.MainButton;
-      if (message.trim() && (!isEditMode || message !== originalContent)) {
+      const tg = window.Telegram.WebApp;
+      const mainButton = tg.MainButton;
+      
+      // Determine mode and set button text
+      const hasQueryId = !!tg.initDataUnsafe?.query_id;
+      const currentIsInlineMode = hasQueryId && !isEditMode; // Don't treat edit mode as inline mode
+      
+      const buttonText = isEditMode 
+        ? '💾 Update Todo' 
+        : currentIsInlineMode 
+          ? '🔄 Share in Chat' 
+          : '📤 Send Message';
+      
+      console.log('Setting main button:', { buttonText, isEditMode, currentIsInlineMode });
+      
+      mainButton.text = buttonText;
+      
+      // Remove previous click handlers
+      try {
+        mainButton.offClick(sendMessage);
+      } catch {
+        // Ignore if not available
+      }
+      
+      // Add new click handler
+      mainButton.onClick(sendMessage);
+      console.log('Main button click handler attached');
+      
+      // Show/hide based on conditions
+      const shouldShow = message.trim() && (!isEditMode || message !== originalContent);
+      console.log('Main button visibility:', { shouldShow, hasMessage: !!message.trim(), isEditMode, messageChanged: message !== originalContent });
+      
+      if (shouldShow) {
         mainButton.show();
       } else {
         mainButton.hide();
       }
     }
-  }, [message, isReady, isEditMode, originalContent]);
+  }, [message, isReady, isEditMode, originalContent, sendMessage]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -269,7 +298,7 @@ export default function Home() {
               className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:text-gray-500 hover:bg-blue-600 transition-colors text-lg"
             >
               {isEditMode 
-                ? '💾 Update' 
+                ? '💾 Update Todo' 
                 : isInlineMode 
                   ? '🔄 Share' 
                   : '📤 Send'
