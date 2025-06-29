@@ -11,7 +11,9 @@ interface SetupResult {
 
 export default function SetupPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [results, setResults] = useState<SetupResult[]>([]);
+  const [statusInfo, setStatusInfo] = useState<Record<string, unknown> | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [nextSteps, setNextSteps] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -44,12 +46,20 @@ export default function SetupPage() {
   };
 
   const checkStatus = async () => {
+    setIsCheckingStatus(true);
+    setError('');
+    setStatusInfo(null);
+    
     try {
       const response = await fetch('/api/setup');
       const data = await response.json();
       console.log('Status:', data);
+      setStatusInfo(data);
     } catch (err) {
       console.error('Status check failed:', err);
+      setError(`Status check failed: ${err}`);
+    } finally {
+      setIsCheckingStatus(false);
     }
   };
 
@@ -98,9 +108,19 @@ export default function SetupPage() {
             
             <button
               onClick={checkStatus}
-              className="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700"
+              disabled={isCheckingStatus}
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              🔍 Check Status
+              {isCheckingStatus ? (
+                <>
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  Checking...
+                </>
+              ) : (
+                <>
+                  🔍 Check Status
+                </>
+              )}
             </button>
           </div>
 
@@ -109,6 +129,84 @@ export default function SetupPage() {
             <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg p-4 mb-6">
               <h3 className="text-red-900 dark:text-red-100 font-semibold mb-1">❌ Error</h3>
               <p className="text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          )}
+
+          {/* Status Display */}
+          {statusInfo && (
+            <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
+              <h3 className="text-blue-900 dark:text-blue-100 font-semibold mb-3">📊 Current Status</h3>
+              <div className="space-y-3">
+                <div className="text-blue-800 dark:text-blue-200">
+                  {typeof statusInfo.message === 'string' && (
+                    <p><strong>Message:</strong> {statusInfo.message}</p>
+                  )}
+                  {typeof statusInfo.instructions === 'string' && (
+                    <p><strong>Instructions:</strong> {statusInfo.instructions}</p>
+                  )}
+                </div>
+                
+                {statusInfo.required_env_vars && typeof statusInfo.required_env_vars === 'object' && statusInfo.required_env_vars !== null && (
+                  <div>
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Environment Variables:</h4>
+                    <div className="space-y-1 text-sm">
+                      {Object.entries(statusInfo.required_env_vars as Record<string, string>).map(([key, value]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <span className="font-mono bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded">{key}:</span>
+                          <span className={typeof value === 'string' && value.includes('✅') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                            {typeof value === 'string' ? value : String(value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {typeof statusInfo.webhook_url === 'string' && (
+                  <div>
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Webhook URL:</h4>
+                    <code className="text-sm bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded break-all">
+                      {statusInfo.webhook_url}
+                    </code>
+                  </div>
+                )}
+
+                {statusInfo.webhook_info && typeof statusInfo.webhook_info === 'object' && statusInfo.webhook_info !== null && (
+                  <div>
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Webhook Configuration:</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="bg-blue-100 dark:bg-blue-800 p-3 rounded">
+                        <pre className="text-xs text-blue-800 dark:text-blue-200 whitespace-pre-wrap">
+                          {JSON.stringify(statusInfo.webhook_info, null, 2)}
+                        </pre>
+                      </div>
+                      
+                      {/* Extract and highlight allowed_updates */}
+                      {(() => {
+                        const webhookInfo = statusInfo.webhook_info as Record<string, unknown>;
+                        const allowedUpdates = webhookInfo.allowed_updates;
+                        if (!Array.isArray(allowedUpdates)) return null;
+                        
+                        return (
+                          <div>
+                            <span className="font-medium text-blue-900 dark:text-blue-100">Allowed Updates:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {allowedUpdates.map((update, index) => (
+                                <span 
+                                  key={index}
+                                  className="px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 rounded text-xs font-mono"
+                                >
+                                  {String(update)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

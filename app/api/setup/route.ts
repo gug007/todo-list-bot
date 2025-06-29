@@ -56,7 +56,7 @@ export async function POST() {
     try {
       const webhookResult = await telegramRequest('setWebhook', {
         url: WEBHOOK_URL,
-        allowed_updates: ['inline_query', 'message']
+        allowed_updates: ['inline_query', 'message', 'web_app_data', 'edited_message']
       });
       results.push({ step: 'Set Webhook', success: true, data: webhookResult });
     } catch (error) {
@@ -109,6 +109,18 @@ export async function POST() {
 }
 
 export async function GET() {
+  let webhookInfo = null;
+  
+  // Try to get webhook info if bot token is available
+  if (BOT_TOKEN) {
+    try {
+      const webhookResult = await telegramRequest('getWebhookInfo');
+      webhookInfo = webhookResult.result;
+    } catch (error) {
+      console.error('Failed to get webhook info:', error);
+    }
+  }
+
   return NextResponse.json({
     message: 'Telegram Bot Setup Endpoint',
     instructions: 'Send a POST request to this endpoint to configure your bot',
@@ -116,6 +128,7 @@ export async function GET() {
       TELEGRAM_BOT_TOKEN: BOT_TOKEN ? '✅ Set' : '❌ Missing',
       VERCEL_URL: WEBHOOK_URL ? '✅ Set' : '❌ Missing'
     },
-    webhook_url: WEBHOOK_URL
+    webhook_url: WEBHOOK_URL,
+    webhook_info: webhookInfo
   });
 } 
