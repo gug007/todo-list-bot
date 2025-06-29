@@ -9,7 +9,39 @@ import type {
 
 const vercelUrl = process.env.VERCEL_URL;
 // Use VERCEL_URL if available, otherwise use the app URL from env variables.
-const appUrl = vercelUrl ? `https://${vercelUrl}` : process.env.NEXT_PUBLIC_APP_URL;
+const appUrl = vercelUrl
+  ? `https://${vercelUrl}`
+  : process.env.NEXT_PUBLIC_APP_URL;
+
+// Bot username and Mini App short name for generating direct Mini App links.
+const botUsername = process.env.TELEGRAM_BOT_USERNAME || "";
+const miniAppName = process.env.TELEGRAM_MINI_APP_NAME || "";
+
+/**
+ * Generates a direct Mini App link in the form:
+ *   https://t.me/<bot_username>/<short_name>?startapp=<start_parameter>
+ * Falls back to the classic web-app URL when required env vars are missing.
+ */
+function getDirectMiniAppLink(startParam: string): string {
+  console.log(botUsername, miniAppName)
+  if (botUsername && miniAppName) {
+    console.log(
+      `https://t.me/${botUsername}/${miniAppName}?startapp=${encodeURIComponent(
+        startParam
+      )}`
+    );
+    return `https://t.me/${botUsername}/${miniAppName}?startapp=${encodeURIComponent(
+      startParam
+    )}`;
+  }
+  // Fallback to the traditional hosted web-app URL (mainly for local development).
+  if (!appUrl) {
+    throw new Error(
+      "App URL is not defined and direct Mini App env vars are missing."
+    );
+  }
+  return `${appUrl}?id=${encodeURIComponent(startParam)}`;
+}
 
 bot.on("inline_query", async (query: InlineQuery) => {
   const queryText = query.query || "";
@@ -24,7 +56,8 @@ bot.on("inline_query", async (query: InlineQuery) => {
           id: "error",
           title: "Configuration Error",
           input_message_content: {
-            message_text: "The application is not configured correctly. Missing APP_URL.",
+            message_text:
+              "The application is not configured correctly. Missing APP_URL.",
           },
         },
       ],
@@ -47,7 +80,7 @@ bot.on("inline_query", async (query: InlineQuery) => {
           [
             {
               text: "Edit message",
-              url: `${appUrl}?text=${encodeURIComponent(messageText)}`,
+              url: getDirectMiniAppLink(messageText),
             },
           ],
         ],
@@ -67,10 +100,10 @@ bot.on("callback_query", async (_callbackQuery: CallbackQuery) => {
 // after the inline message is sent.
 bot.on("chosen_inline_result", async (chosen: ChosenInlineResult) => {
   const inlineId = chosen.inline_message_id;
+  console.log(4444, chosen)
   if (!inlineId || !appUrl) return;
 
-  const originalText = `Original message: ${chosen.query || ""}`;
-  const updatedUrl = `${appUrl}?id=${inlineId}&text=${encodeURIComponent(originalText)}`;
+  const updatedUrl = getDirectMiniAppLink(inlineId);
 
   try {
     await bot.editMessageReplyMarkup(
@@ -98,4 +131,4 @@ bot.on("chosen_inline_result", async (chosen: ChosenInlineResult) => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 bot.on("message", (_msg: Message) => {
   // Not used
-}); 
+});
