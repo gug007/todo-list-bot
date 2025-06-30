@@ -75,7 +75,10 @@ bot.on("inline_query", async (query: InlineQuery) => {
     {
       type: "article",
       id: "1",
-      title: "Create a new message",
+      title: "📝 Create Todo List",
+      description: query
+      ? formattedQueryText
+      : "Create a new todo list",
       input_message_content: {
         message_text: formattedQueryText,
       },
