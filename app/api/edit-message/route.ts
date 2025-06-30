@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         inline_keyboard: [
           [
             {
-              text: "Edit message",
+              text: "Edit",
               url: getDirectMiniAppLink({ id: inline_message_id, q: text }),
             },
           ],

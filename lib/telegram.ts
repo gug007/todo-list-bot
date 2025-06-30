@@ -1,5 +1,6 @@
 import bot from "./bot";
 import { encodeStartParam } from "./startParams";
+import { formatTodoText } from "./todoFormatter";
 import type {
   InlineQuery,
   CallbackQuery,
@@ -68,20 +69,22 @@ bot.on("inline_query", async (query: InlineQuery) => {
     return;
   }
 
+  const formattedQueryText = formatTodoText(queryText);
+
   const results: InlineQueryResultArticle[] = [
     {
       type: "article",
       id: "1",
       title: "Create a new message",
       input_message_content: {
-        message_text: queryText,
+        message_text: formattedQueryText,
       },
       reply_markup: {
         inline_keyboard: [
           [
             {
-              text: "Edit message",
-              url: getDirectMiniAppLink({ q: queryText }),
+              text: "Edit",
+              url: getDirectMiniAppLink({ q: formattedQueryText }),
             },
           ],
         ],
@@ -112,7 +115,7 @@ bot.on("chosen_inline_result", async (chosen: ChosenInlineResult) => {
         inline_keyboard: [
           [
             {
-              text: "Edit message",
+              text: "Edit",
               url: updatedUrl,
             },
           ],
