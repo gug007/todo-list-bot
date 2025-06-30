@@ -3,8 +3,8 @@ import "@/lib/telegram"; // Import to register listeners
 import { NextRequest, NextResponse } from "next/server";
 
 // Use VERCEL_URL if available, otherwise use the ngrok URL from env variables.
-const WEBHOOK_URL = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}/api/bot`
+const WEBHOOK_URL = process.env.NEXT_PUBLIC_APP_URL
+  ? `NEXT_PUBLIC_APP_URL/api/bot`
   : process.env.NEXT_PUBLIC_WEBHOOK_URL;
 
 export async function GET() {

@@ -9,11 +9,7 @@ import type {
   InlineQueryResultArticle,
 } from "node-telegram-bot-api";
 
-const vercelUrl = process.env.VERCEL_URL;
-// Use VERCEL_URL if available, otherwise use the app URL from env variables.
-const appUrl = vercelUrl
-  ? `https://${vercelUrl}`
-  : process.env.NEXT_PUBLIC_APP_URL;
+const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
 // Bot username and Mini App short name for generating direct Mini App links.
 const botUsername = process.env.TELEGRAM_BOT_USERNAME || "";
@@ -24,7 +20,9 @@ const miniAppName = process.env.TELEGRAM_MINI_APP_NAME || "";
  *   https://t.me/<bot_username>/<short_name>?startapp=<start_parameter>
  * Falls back to the classic web-app URL when required env vars are missing.
  */
-export function getDirectMiniAppLink(startParamObj: Record<string, unknown>): string {
+export function getDirectMiniAppLink(
+  startParamObj: Record<string, unknown>
+): string {
   const startParam = encodeStartParam(startParamObj);
   console.log(botUsername, miniAppName);
   if (botUsername && miniAppName) {
@@ -76,9 +74,7 @@ bot.on("inline_query", async (query: InlineQuery) => {
       type: "article",
       id: "1",
       title: "📝 Create Todo List",
-      description: query
-      ? formattedQueryText
-      : "Create a new todo list",
+      description: query ? formattedQueryText : "Create a new todo list",
       input_message_content: {
         message_text: formattedQueryText,
       },
