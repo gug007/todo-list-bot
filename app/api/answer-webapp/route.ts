@@ -1,5 +1,6 @@
 import bot from "@/lib/bot";
 import { NextRequest, NextResponse } from "next/server";
+import type { InlineQueryResultArticle } from "node-telegram-bot-api";
 
 export async function POST(request: NextRequest) {
   const { query_id, text } = await request.json();
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
       input_message_content: {
         message_text: text,
       },
-    } as any);
+    } as InlineQueryResultArticle);
 
     return NextResponse.json({ status: "ok" });
   } catch (err) {
