@@ -8,6 +8,7 @@ interface MessageEditorProps {
   setText: (text: string) => void;
   onSubmit: () => void;
   disabled: boolean;
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
 export default function MessageEditor({
@@ -15,6 +16,7 @@ export default function MessageEditor({
   setText,
   onSubmit,
   disabled,
+  onDragStateChange,
 }: MessageEditorProps) {
   const [localText, setLocalText] = useState(() => formatTodoText(text));
   const [isUpdating, setIsUpdating] = useState(false);
@@ -94,6 +96,7 @@ export default function MessageEditor({
           text={localText}
           setText={setLocalText}
           setHasUserChanges={setHasUserChanges}
+          onDragStateChange={onDragStateChange}
         />
       )}
     </div>

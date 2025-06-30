@@ -30,6 +30,7 @@ interface DragCheckEditorProps {
   text: string;
   setText: (text: string) => void;
   setHasUserChanges: (hasChanges: boolean) => void;
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
 interface SortableTodoItemProps {
@@ -89,7 +90,7 @@ function SortableTodoItem({ item, onToggle }: SortableTodoItemProps) {
   );
 }
 
-export default function DragCheckEditor({ text, setText, setHasUserChanges }: DragCheckEditorProps) {
+export default function DragCheckEditor({ text, setText, setHasUserChanges, onDragStateChange }: DragCheckEditorProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -172,8 +173,16 @@ export default function DragCheckEditor({ text, setText, setHasUserChanges }: Dr
     setHasUserChanges(true);
   };
 
+  const handleDragStart = () => {
+    // Notify parent that dragging has started
+    onDragStateChange?.(true);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+
+    // Notify parent that dragging has ended
+    onDragStateChange?.(false);
 
     if (active.id !== over?.id) {
       const items = parseTodoItems(text);
@@ -202,6 +211,7 @@ export default function DragCheckEditor({ text, setText, setHasUserChanges }: Dr
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={todoItems.map(item => item.id)} strategy={verticalListSortingStrategy}>

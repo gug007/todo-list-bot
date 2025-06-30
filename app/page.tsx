@@ -7,12 +7,26 @@ import MessageEditor from "./components/MessageEditor";
 export default function Home() {
   const [text, setText] = useState("");
   const [inlineMessageId, setInlineMessageId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   console.log("inlineMessageId", inlineMessageId);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.Telegram) {
       const tg = window.Telegram.WebApp;
       tg.ready();
+
+      // Configure the mini app for better drag and drop experience
+      if (tg.isVersionAtLeast && tg.isVersionAtLeast("6.2")) {
+        // Enable closing confirmation to prevent accidental closure
+        if (tg.enableClosingConfirmation) {
+          tg.enableClosingConfirmation();
+        }
+      }
+
+      // Expand to full height for better drag experience
+      if (tg.expand) {
+        tg.expand();
+      }
 
       const params = new URLSearchParams(window.location.search);
 
@@ -42,6 +56,25 @@ export default function Home() {
       }
     }
   }, []);
+
+  // Handle drag state changes to control mini app behavior
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.Telegram) {
+      const tg = window.Telegram.WebApp;
+      
+      if (isDragging) {
+        // Disable vertical swipes during drag to prevent mini app from closing
+        if (tg.disableVerticalSwipes && tg.isVersionAtLeast && tg.isVersionAtLeast("7.7")) {
+          tg.disableVerticalSwipes();
+        }
+      } else {
+        // Re-enable vertical swipes when not dragging
+        if (tg.enableVerticalSwipes && tg.isVersionAtLeast && tg.isVersionAtLeast("7.7")) {
+          tg.enableVerticalSwipes();
+        }
+      }
+    }
+  }, [isDragging]);
 
   const handleSubmit = async () => {
     if (!inlineMessageId) {
@@ -78,6 +111,7 @@ export default function Home() {
       setText={setText}
       onSubmit={handleSubmit}
       disabled={!text || !inlineMessageId}
+      onDragStateChange={setIsDragging}
     />
   );
 }

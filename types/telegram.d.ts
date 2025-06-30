@@ -12,6 +12,12 @@ interface TelegramWebApp {
   };
   ready: () => void;
   close: () => void;
+  expand: () => void;
+  enableClosingConfirmation: () => void;
+  disableClosingConfirmation: () => void;
+  enableVerticalSwipes: () => void;
+  disableVerticalSwipes: () => void;
+  isVersionAtLeast: (version: string) => boolean;
 }
 
 interface Window {
