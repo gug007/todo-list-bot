@@ -23,7 +23,7 @@ const miniAppName = process.env.TELEGRAM_MINI_APP_NAME || "";
  *   https://t.me/<bot_username>/<short_name>?startapp=<start_parameter>
  * Falls back to the classic web-app URL when required env vars are missing.
  */
-function getDirectMiniAppLink(startParamObj: Record<string, unknown>): string {
+export function getDirectMiniAppLink(startParamObj: Record<string, unknown>): string {
   const startParam = encodeStartParam(startParamObj);
   console.log(botUsername, miniAppName);
   if (botUsername && miniAppName) {
@@ -68,14 +68,13 @@ bot.on("inline_query", async (query: InlineQuery) => {
     return;
   }
 
-  const messageText = `Original message: ${queryText}`;
   const results: InlineQueryResultArticle[] = [
     {
       type: "article",
       id: "1",
       title: "Create a new message",
       input_message_content: {
-        message_text: messageText,
+        message_text: queryText,
       },
       reply_markup: {
         inline_keyboard: [

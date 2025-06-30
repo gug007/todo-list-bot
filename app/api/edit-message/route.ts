@@ -1,6 +1,8 @@
 import bot from "@/lib/bot";
-import { encodeStartParam } from "@/lib/startParams";
 import { NextRequest, NextResponse } from "next/server";
+
+// Import the getDirectMiniAppLink function from the telegram utility file
+import { getDirectMiniAppLink } from "@/lib/telegram";
 
 export async function POST(request: NextRequest) {
   const { inline_message_id, text } = await request.json();
@@ -12,14 +14,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!appUrl) {
-    return NextResponse.json(
-      { error: "App URL is not configured" },
-      { status: 500 }
-    );
-  }
-
   try {
     await bot.editMessageText(text, {
       inline_message_id: inline_message_id,
@@ -28,7 +22,7 @@ export async function POST(request: NextRequest) {
           [
             {
               text: "Edit message",
-              url: `${appUrl}?id=${encodeStartParam({ id: inline_message_id, q: text })}`,
+              url: getDirectMiniAppLink({ id: inline_message_id, q: text }),
             },
           ],
         ],
