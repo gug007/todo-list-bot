@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { decodeStartParam } from "@/lib/startParams";
+import MessageEditor from "./components/MessageEditor";
 
 export default function Home() {
   const [text, setText] = useState("");
@@ -72,25 +73,11 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-100">
-      <div className="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
-        <h1 className="text-xl font-semibold text-center text-gray-800 mb-4">
-          Edit Message
-        </h1>
-        <textarea
-          className="w-full h-40 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Enter your message..."
-        />
-        <button
-          onClick={handleSubmit}
-          className="w-full mt-4 px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
-          disabled={!text || !inlineMessageId}
-        >
-          Update Message
-        </button>
-      </div>
-    </main>
+    <MessageEditor
+      text={text}
+      setText={setText}
+      onSubmit={handleSubmit}
+      disabled={!text || !inlineMessageId}
+    />
   );
 }
