@@ -71,13 +71,13 @@ export default function MessageEditor({
         </div>
 
         {/* Minimal save area */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {isUpdating && (
-            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
           )}
           <button
             onClick={onSubmit}
-            className="px-4 py-1.5 text-sm font-medium text-white bg-blue-500 rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
             disabled={disabled}
           >
             Save
