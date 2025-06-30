@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { decodeStartParam } from "@/lib/startParams";
 
 export default function Home() {
   const [text, setText] = useState("");
@@ -18,10 +19,20 @@ export default function Home() {
       console.log("search", window.location.search);
       const initialText = params.get("text");
       const qidParam = params.get("qid");
-      const idParam = params.get("tgWebAppStartParam");
+      const startParam = params.get("tgWebAppStartParam") || params.get("id");
+
       if (initialText) setText(initialText);
       if (qidParam) setQueryId(qidParam);
-      if (idParam) setInlineMessageId(idParam);
+
+      if (startParam) {
+        try {
+          const data = decodeStartParam<{ id?: string; q?: string }>(startParam);
+          if (data.id) setInlineMessageId(data.id);
+          if (data.q && !initialText) setText(data.q);
+        } catch (err) {
+          console.error("Failed to decode start param", err);
+        }
+      }
 
       const initStr = tg.initData || "";
       if (initStr) {

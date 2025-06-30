@@ -1,4 +1,5 @@
 import bot from "@/lib/bot";
+import { encodeStartParam } from "@/lib/startParams";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
           [
             {
               text: "Edit message",
-              url: `${appUrl}?id=${inline_message_id}&text=${encodeURIComponent(text)}`,
+              url: `${appUrl}?id=${encodeStartParam({ id: inline_message_id, q: text })}`,
             },
           ],
         ],
