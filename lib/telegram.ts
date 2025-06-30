@@ -23,7 +23,7 @@ const miniAppName = process.env.TELEGRAM_MINI_APP_NAME || "";
  * Falls back to the classic web-app URL when required env vars are missing.
  */
 function getDirectMiniAppLink(startParam: string): string {
-  console.log(botUsername, miniAppName)
+  console.log(botUsername, miniAppName);
   if (botUsername && miniAppName) {
     console.log(
       `https://t.me/${botUsername}/${miniAppName}?startapp=${encodeURIComponent(
@@ -100,7 +100,7 @@ bot.on("callback_query", async (_callbackQuery: CallbackQuery) => {
 // after the inline message is sent.
 bot.on("chosen_inline_result", async (chosen: ChosenInlineResult) => {
   const inlineId = chosen.inline_message_id;
-  console.log(4444, chosen)
+  console.log(44444444, chosen);
   if (!inlineId || !appUrl) return;
 
   const updatedUrl = getDirectMiniAppLink(inlineId);

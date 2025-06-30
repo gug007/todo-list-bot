@@ -6,16 +6,19 @@ export default function Home() {
   const [text, setText] = useState("");
   const [queryId, setQueryId] = useState<string | null>(null);
   const [inlineMessageId, setInlineMessageId] = useState<string | null>(null);
+  console.log('inlineMessageId', inlineMessageId)
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.Telegram) {
       const tg = window.Telegram.WebApp;
       tg.ready();
-      
+
       const params = new URLSearchParams(window.location.search);
+
+      console.log("search", window.location.search);
       const initialText = params.get("text");
       const qidParam = params.get("qid");
-      const idParam = params.get("id");
+      const idParam = params.get("tgWebAppStartParam");
       if (initialText) setText(initialText);
       if (qidParam) setQueryId(qidParam);
       if (idParam) setInlineMessageId(idParam);
@@ -77,7 +80,7 @@ export default function Home() {
         <button
           onClick={handleSubmit}
           className="w-full mt-4 px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
-          disabled={!text || (!queryId && !inlineMessageId)}
+          disabled={!text || !inlineMessageId}
         >
           Update Message
         </button>

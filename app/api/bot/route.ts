@@ -17,7 +17,7 @@ export async function GET() {
       { status: 400 }
     );
   }
-  await bot.setWebHook(WEBHOOK_URL, {
+  const response = await bot.setWebHook(WEBHOOK_URL, {
     allowed_updates: [
       "inline_query",
       "chosen_inline_result",
@@ -25,6 +25,7 @@ export async function GET() {
       "message",
     ],
   });
+  console.log(response);
   return NextResponse.json({
     message: `Webhook set to ${WEBHOOK_URL}`,
   });
