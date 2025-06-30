@@ -5,9 +5,8 @@ import { decodeStartParam } from "@/lib/startParams";
 
 export default function Home() {
   const [text, setText] = useState("");
-  const [queryId, setQueryId] = useState<string | null>(null);
   const [inlineMessageId, setInlineMessageId] = useState<string | null>(null);
-  console.log('inlineMessageId', inlineMessageId)
+  console.log("inlineMessageId", inlineMessageId);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.Telegram) {
@@ -18,15 +17,15 @@ export default function Home() {
 
       console.log("search", window.location.search);
       const initialText = params.get("text");
-      const qidParam = params.get("qid");
       const startParam = params.get("tgWebAppStartParam") || params.get("id");
 
       if (initialText) setText(initialText);
-      if (qidParam) setQueryId(qidParam);
 
       if (startParam) {
         try {
-          const data = decodeStartParam<{ id?: string; q?: string }>(startParam);
+          const data = decodeStartParam<{ id?: string; q?: string }>(
+            startParam
+          );
           if (data.id) setInlineMessageId(data.id);
           if (data.q && !initialText) setText(data.q);
         } catch (err) {
@@ -37,8 +36,6 @@ export default function Home() {
       const initStr = tg.initData || "";
       if (initStr) {
         const initSearch = new URLSearchParams(initStr);
-        const qid = initSearch.get("query_id");
-        if (qid) setQueryId(qid);
         const imid = initSearch.get("inline_message_id");
         if (imid) setInlineMessageId(imid);
       }
@@ -46,15 +43,13 @@ export default function Home() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!queryId && !inlineMessageId) {
+    if (!inlineMessageId) {
       alert("No identifiers to update message");
       return;
     }
 
-    const endpoint = queryId ? "/api/answer-webapp" : "/api/edit-message";
-    const payload = queryId
-      ? { query_id: queryId, text }
-      : { inline_message_id: inlineMessageId, text };
+    const endpoint = "/api/edit-message";
+    const payload = { inline_message_id: inlineMessageId, text };
 
     try {
       const response = await fetch(endpoint, {
