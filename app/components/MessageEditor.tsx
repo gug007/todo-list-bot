@@ -44,39 +44,40 @@ export default function MessageEditor({
 
   return (
     <div className="fixed inset-0 flex flex-col bg-gray-50">
-      {/* Status bar with tabs */}
-      <div className="h-12 flex items-center justify-between px-4 bg-white border-b">
-        <div className="flex items-center gap-4">
-          <div className="flex border border-gray-200 rounded-md overflow-hidden">
-            <button
-              onClick={() => setActiveTab("text")}
-              className={`px-3 py-1 text-sm font-medium ${
-                activeTab === "text"
-                  ? "bg-blue-500 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              Text Editor
-            </button>
-            <button
-              onClick={() => setActiveTab("drag")}
-              className={`px-3 py-1 text-sm font-medium ${
-                activeTab === "drag"
-                  ? "bg-blue-500 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              Drag &amp; Check
-            </button>
-          </div>
+      {/* Minimal header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-white">
+        {/* Simple tabs */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab("text")}
+            className={`px-3 py-1 text-sm rounded transition-colors ${
+              activeTab === "text"
+                ? "text-blue-600 bg-blue-50"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Text
+          </button>
+          <button
+            onClick={() => setActiveTab("drag")}
+            className={`px-3 py-1 text-sm rounded transition-colors ${
+              activeTab === "drag"
+                ? "text-blue-600 bg-blue-50"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Drag
+          </button>
         </div>
-        <div className="flex items-center gap-4">
+
+        {/* Minimal save area */}
+        <div className="flex items-center gap-3">
           {isUpdating && (
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
           )}
           <button
             onClick={onSubmit}
-            className="px-4 py-2 text-sm text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
+            className="px-4 py-1.5 text-sm font-medium text-white bg-blue-500 rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
             disabled={disabled}
           >
             Save
