@@ -11,6 +11,9 @@
     "setup:local": "echo 'Create .env.local with TELEGRAM_BOT_TOKEN=your_token_here'"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@types/node-telegram-bot-api": "^0.64.9",
     "next": "15.3.4",
     "node-telegram-bot-api": "^0.66.0",

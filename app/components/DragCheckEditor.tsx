@@ -1,5 +1,23 @@
-import { useState } from "react";
 import { toggleTodoState, TODO_SYMBOLS } from "../../lib/todoFormatter";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface TodoItem {
   id: string;
@@ -14,8 +32,70 @@ interface DragCheckEditorProps {
   setHasUserChanges: (hasChanges: boolean) => void;
 }
 
+interface SortableTodoItemProps {
+  item: TodoItem;
+  onToggle: (itemId: string) => void;
+}
+
+function SortableTodoItem({ item, onToggle }: SortableTodoItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    marginLeft: item.indentation.length * 16,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow ${
+        isDragging ? "opacity-50" : ""
+      }`}
+    >
+      <button
+        onClick={() => onToggle(item.id)}
+        className="flex-shrink-0 text-lg hover:scale-110 transition-transform"
+      >
+        {item.symbol}
+      </button>
+      <span
+        className={`flex-1 ${
+          item.symbol === TODO_SYMBOLS.COMPLETED
+            ? "line-through text-gray-500"
+            : item.symbol === TODO_SYMBOLS.CANCELLED
+            ? "line-through text-red-500"
+            : "text-gray-800"
+        }`}
+      >
+        {item.content || "Empty task"}
+      </span>
+      <div
+        {...attributes}
+        {...listeners}
+        className="flex-shrink-0 text-gray-400 cursor-grab active:cursor-grabbing px-2 py-1 rounded hover:bg-gray-100"
+      >
+        ⋮⋮
+      </div>
+    </div>
+  );
+}
+
 export default function DragCheckEditor({ text, setText, setHasUserChanges }: DragCheckEditorProps) {
-  const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Parse text into todo items
   const parseTodoItems = (text: string): TodoItem[] => {
@@ -92,35 +172,19 @@ export default function DragCheckEditor({ text, setText, setHasUserChanges }: Dr
     setHasUserChanges(true);
   };
 
-  const handleDragStart = (e: React.DragEvent, itemId: string) => {
-    setDraggedItem(itemId);
-    e.dataTransfer.effectAllowed = "move";
-  };
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
-
-  const handleDrop = (e: React.DragEvent, targetItemId: string) => {
-    e.preventDefault();
-    
-    if (!draggedItem || draggedItem === targetItemId) return;
-    
-    const items = parseTodoItems(text);
-    const draggedIndex = items.findIndex(item => item.id === draggedItem);
-    const targetIndex = items.findIndex(item => item.id === targetItemId);
-    
-    if (draggedIndex === -1 || targetIndex === -1) return;
-    
-    const newItems = [...items];
-    const [draggedTodo] = newItems.splice(draggedIndex, 1);
-    newItems.splice(targetIndex, 0, draggedTodo);
-    
-    const newText = todoItemsToText(newItems);
-    setText(newText);
-    setHasUserChanges(true);
-    setDraggedItem(null);
+    if (active.id !== over?.id) {
+      const items = parseTodoItems(text);
+      const oldIndex = items.findIndex(item => item.id === active.id);
+      const newIndex = items.findIndex(item => item.id === over?.id);
+      
+      const newItems = arrayMove(items, oldIndex, newIndex);
+      const newText = todoItemsToText(newItems);
+      setText(newText);
+      setHasUserChanges(true);
+    }
   };
 
   const addNewTodo = () => {
@@ -135,40 +199,21 @@ export default function DragCheckEditor({ text, setText, setHasUserChanges }: Dr
     <div className="flex-1 overflow-auto">
       <div className="p-4 max-w-2xl mx-auto">
         <div className="space-y-2">
-          {todoItems.map((item) => (
-            <div
-              key={item.id}
-              draggable
-              onDragStart={(e) => handleDragStart(e, item.id)}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, item.id)}
-              className={`flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 cursor-move hover:shadow-sm transition-shadow ${
-                draggedItem === item.id ? "opacity-50" : ""
-              }`}
-              style={{ marginLeft: item.indentation.length * 16 }}
-            >
-              <button
-                onClick={() => handleToggleTodo(item.id)}
-                className="flex-shrink-0 text-lg hover:scale-110 transition-transform"
-              >
-                {item.symbol}
-              </button>
-              <span
-                className={`flex-1 ${
-                  item.symbol === TODO_SYMBOLS.COMPLETED
-                    ? "line-through text-gray-500"
-                    : item.symbol === TODO_SYMBOLS.CANCELLED
-                    ? "line-through text-red-500"
-                    : "text-gray-800"
-                }`}
-              >
-                {item.content || "Empty task"}
-              </span>
-              <div className="flex-shrink-0 text-gray-400">
-                ⋮⋮
-              </div>
-            </div>
-          ))}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={todoItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
+              {todoItems.map((item) => (
+                <SortableTodoItem
+                  key={item.id}
+                  item={item}
+                  onToggle={handleToggleTodo}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
           
           {todoItems.length === 0 && (
             <div className="text-center py-8 text-gray-500">
