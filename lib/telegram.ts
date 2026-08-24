@@ -44,6 +44,9 @@ export function getDirectMiniAppLink(
   return `${appUrl}?id=${encodeURIComponent(startParam)}`;
 }
 
+// Telegram truncates inline queries at 256 characters before they reach the bot.
+const INLINE_QUERY_LIMIT = 256;
+
 bot.on("inline_query", async (query: InlineQuery) => {
   const queryText = query.query || "";
   if (!appUrl) {
@@ -69,12 +72,21 @@ bot.on("inline_query", async (query: InlineQuery) => {
 
   const formattedQueryText = formatTodoText(queryText);
 
+  // A query at (or one short of) the limit was almost certainly cut off by Telegram.
+  const isLikelyTruncated = queryText.length >= INLINE_QUERY_LIMIT - 1;
+
   const results: InlineQueryResultArticle[] = [
     {
       type: "article",
       id: "1",
-      title: "📝 Create Todo List",
-      description: query ? formattedQueryText : "Create a new todo list",
+      title: isLikelyTruncated
+        ? "⚠️ Text cut off at 256 characters"
+        : "📝 Create Todo List",
+      description: isLikelyTruncated
+        ? "Telegram limits inline text to 256 chars. Send the full text to the bot chat instead, then forward the list."
+        : queryText
+        ? formattedQueryText
+        : "Create a new todo list",
       input_message_content: {
         message_text: formattedQueryText,
       },
@@ -129,9 +141,53 @@ bot.on("chosen_inline_result", async (chosen: ChosenInlineResult) => {
   }
 });
 
-// We can listen to any message to extract text and provide a way to edit it.
-// This is not part of the original request, but it's a good example.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-bot.on("message", (_msg: Message) => {
-  // Not used
+// Direct-chat fallback: inline queries are capped at 256 characters by
+// Telegram, so longer lists must be sent to the bot's private chat. The bot
+// replies with the formatted checklist, which can then be forwarded.
+bot.on("message", async (msg: Message) => {
+  // Only plain text sent directly to the bot in a private chat; ignore
+  // messages sent *via* the bot (inline results) so we don't reply to our
+  // own checklists. `via_bot` is missing from the outdated library typings.
+  const viaBot = (msg as Message & { via_bot?: { id: number } }).via_bot;
+  if (msg.chat.type !== "private" || !msg.text || viaBot) return;
+
+  if (msg.text.startsWith("/")) {
+    if (msg.text.startsWith("/start")) {
+      await bot.sendMessage(
+        msg.chat.id,
+        "Send me any text and I'll turn it into a todo list you can forward.\n\n" +
+          `Tip: inline mode (@${botUsername} ...) is limited to ${INLINE_QUERY_LIMIT} characters by Telegram — for longer lists send the text here.`
+      );
+    }
+    return;
+  }
+
+  const formattedText = formatTodoText(msg.text);
+
+  try {
+    const sent = await bot.sendMessage(msg.chat.id, formattedText);
+    // The Edit link needs the message id, which is only known after sending.
+    await bot.editMessageReplyMarkup(
+      {
+        inline_keyboard: [
+          [
+            {
+              text: "Edit",
+              url: getDirectMiniAppLink({
+                c: sent.chat.id,
+                m: sent.message_id,
+                q: formattedText,
+              }),
+            },
+          ],
+        ],
+      },
+      {
+        chat_id: sent.chat.id,
+        message_id: sent.message_id,
+      }
+    );
+  } catch (err) {
+    console.error("Failed to send todo list reply", err);
+  }
 });

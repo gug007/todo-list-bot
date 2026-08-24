@@ -5,29 +5,51 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDirectMiniAppLink } from "@/lib/telegram";
 
 export async function POST(request: NextRequest) {
-  const { inline_message_id, text } = await request.json();
+  const { inline_message_id, chat_id, message_id, text } = await request.json();
 
-  if (!inline_message_id || !text) {
+  if (!text || (!inline_message_id && !(chat_id && message_id))) {
     return NextResponse.json(
-      { error: "inline_message_id and text are required" },
+      {
+        error:
+          "text and either inline_message_id or chat_id + message_id are required",
+      },
       { status: 400 }
     );
   }
 
   try {
-    await bot.editMessageText(text, {
-      inline_message_id: inline_message_id,
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "Edit",
-              url: getDirectMiniAppLink({ id: inline_message_id, q: text }),
-            },
+    if (inline_message_id) {
+      // Message sent via inline mode.
+      await bot.editMessageText(text, {
+        inline_message_id: inline_message_id,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "Edit",
+                url: getDirectMiniAppLink({ id: inline_message_id, q: text }),
+              },
+            ],
           ],
-        ],
-      },
-    });
+        },
+      });
+    } else {
+      // Message sent by the bot in a private chat.
+      await bot.editMessageText(text, {
+        chat_id: chat_id,
+        message_id: message_id,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "Edit",
+                url: getDirectMiniAppLink({ c: chat_id, m: message_id, q: text }),
+              },
+            ],
+          ],
+        },
+      });
+    }
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     console.error(error);
@@ -36,4 +58,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

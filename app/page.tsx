@@ -7,8 +7,12 @@ import MessageEditor from "./components/MessageEditor";
 export default function Home() {
   const [text, setText] = useState("");
   const [inlineMessageId, setInlineMessageId] = useState<string | null>(null);
+  const [chatMessage, setChatMessage] = useState<{
+    chatId: number;
+    messageId: number;
+  } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  console.log("inlineMessageId", inlineMessageId);
+  console.log("inlineMessageId", inlineMessageId, "chatMessage", chatMessage);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.Telegram) {
@@ -38,10 +42,16 @@ export default function Home() {
 
       if (startParam) {
         try {
-          const data = decodeStartParam<{ id?: string; q?: string }>(
-            startParam
-          );
+          const data = decodeStartParam<{
+            id?: string;
+            q?: string;
+            c?: number;
+            m?: number;
+          }>(startParam);
           if (data.id) setInlineMessageId(data.id);
+          if (data.c && data.m) {
+            setChatMessage({ chatId: data.c, messageId: data.m });
+          }
           if (data.q && !initialText) setText(data.q);
         } catch (err) {
           console.error("Failed to decode start param", err);
@@ -77,13 +87,19 @@ export default function Home() {
   }, [isDragging]);
 
   const handleSubmit = async () => {
-    if (!inlineMessageId) {
+    if (!inlineMessageId && !chatMessage) {
       alert("No identifiers to update message");
       return;
     }
 
     const endpoint = "/api/edit-message";
-    const payload = { inline_message_id: inlineMessageId, text };
+    const payload = inlineMessageId
+      ? { inline_message_id: inlineMessageId, text }
+      : {
+          chat_id: chatMessage!.chatId,
+          message_id: chatMessage!.messageId,
+          text,
+        };
 
     try {
       const response = await fetch(endpoint, {
@@ -110,7 +126,7 @@ export default function Home() {
       text={text}
       setText={setText}
       onSubmit={handleSubmit}
-      disabled={!text || !inlineMessageId}
+      disabled={!text || (!inlineMessageId && !chatMessage)}
       onDragStateChange={setIsDragging}
     />
   );
